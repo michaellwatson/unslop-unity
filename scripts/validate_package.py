@@ -32,6 +32,14 @@ def main() -> int:
     require(ROOT / "Editor" / "Bootstrap" / "UnslopBootstrap.cs")
     require(ROOT / "Editor" / "Bootstrap" / "PackageInfo.cs")
     require(ROOT / "Editor" / "Settings" / "UnslopProjectSettings.cs")
+    require(ROOT / "Editor" / "Api" / "UnslopApiClient.cs")
+    require(ROOT / "Editor" / "Api" / "IUnslopApiClient.cs")
+    require(ROOT / "Editor" / "UI" / "UnslopBridgeWindow.cs")
+    require(ROOT / "Editor" / "Authentication" / "ProjectBindingService.cs")
+    require(ROOT / "Editor" / "Services" / "BridgeServices.cs")
+    require(ROOT / "Editor" / "Manifests" / "ManifestValidator.cs")
+    require(ROOT / "Tests" / "Editor" / "Unslop.UnityBridge.Editor.Tests.asmdef")
+    require(ROOT / "Tests" / "Fixtures" / "sample_asset_manifest.json")
     require(ROOT / "Documentation~", "dir")
 
     pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
@@ -42,6 +50,8 @@ def main() -> int:
     deps = pkg.get("dependencies") or {}
     if "com.unity.render-pipelines.universal" not in deps:
         errors.append("package.json missing URP dependency")
+    if "com.unity.nuget.newtonsoft-json" not in deps:
+        errors.append("package.json missing Newtonsoft.Json dependency")
 
     runtime_asm = json.loads((ROOT / "Runtime" / "Unslop.UnityBridge.Runtime.asmdef").read_text(encoding="utf-8"))
     editor_asm = json.loads((ROOT / "Editor" / "Unslop.UnityBridge.Editor.asmdef").read_text(encoding="utf-8"))

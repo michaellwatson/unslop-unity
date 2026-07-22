@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "asset_id": "d3a121cd-5351-4665-a858-ac3eb452fefe",
+  "asset_version_id": "50a7b4ff-a81c-43dd-87c5-980f4ca91817",
+  "version_number": 1,
+  "display_name": "Concrete Alphabet Blo — Large",
+  "content_kind": "static_mesh",
+  "minimum_bridge_version": "1.0.0",
+  "model": {
+    "file_id": "d50c9f4e-6916-4027-aa6f-dca1c90e7b14",
+    "relative_path": "model.fbx",
+    "format": "fbx",
+    "source_up_axis": "Y",
+    "source_forward_axis": "Z",
+    "source_units": "metres"
+  },
+  "compatibility": {
+    "classification": "compatible",
+    "declared_changes": ["geometry"],
+    "hierarchy_compatible": true,
+    "material_slots_compatible": true
+  },
+  "files": [
+    {
+      "file_id": "d50c9f4e-6916-4027-aa6f-dca1c90e7b14",
+      "role": "model",
+      "relative_path": "model.fbx",
+      "media_type": "application/octet-stream",
+      "byte_length": 40425628,
+      "sha256": "e2e0d67f77572f06b00f2c257e45634e0d77279eadd9b8ba7898885a1d7ddb3d"
+    },
+    {
+      "file_id": "c202158c-0b58-4a74-910a-e04e906a9481",
+      "role": "texture",
+      "relative_path": "textures/basecolor.png",
+      "media_type": "image/png",
+      "byte_length": 25315050,
+      "sha256": "12462738fb65b8ed6f3e0fbce5d4bb88ad6d19fdd737a9ab8a857812f3a5af51"
+    },
+    {
+      "file_id": "de158aee-9b29-4205-83d5-92f80fc2dc68",
+      "role": "material_manifest",
+      "relative_path": "materials.json",
+      "media_type": "application/json",
+      "byte_length": 312,
+      "sha256": "b4d28d17845ec43ff71f47cbb9a1575771f679440da8f5ce05ef28504df7664e"
+    },
+    {
+      "file_id": "f18c7cec-cfa1-4c62-9bbe-06431410a71f",
+      "role": "asset_manifest",
+      "relative_path": "asset.json",
+      "media_type": "application/json",
+      "byte_length": 2131,
+      "sha256": "338b3d84cc2be94de34245310595362ee407f29835c255497cbf9f6ceb1093ce"
+    }
+  ]
+}

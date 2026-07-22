@@ -1,5 +1,7 @@
 /.local/
 /.cursor/
+**/__pycache__/
+*.pyc
 *.user
 *.suo
 .DS_Store

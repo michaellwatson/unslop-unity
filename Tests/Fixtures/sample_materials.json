@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "materials": [
+    {
+      "material_id": "mat_main",
+      "display_name": "Main",
+      "model": "metallic_roughness",
+      "textures": {
+        "base_color": "textures/basecolor.png",
+        "normal": "textures/normal.png",
+        "roughness": "textures/roughness.png"
+      }
+    }
+  ],
+  "slots": [
+    {
+      "slot_id": "slot_body",
+      "display_name": "Body",
+      "material_id": "mat_main"
+    }
+  ]
+}
