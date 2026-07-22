@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Unslop.UnityBridge.Editor.Api;
 using Unslop.UnityBridge.Editor.Authentication;
 using Unslop.UnityBridge.Editor.Bootstrap;
 using Unslop.UnityBridge.Editor.Diagnostics;
+using Unslop.UnityBridge.Editor.Install;
 using Unslop.UnityBridge.Editor.Locking;
 using Unslop.UnityBridge.Editor.Services;
 using UnityEditor;
@@ -17,16 +19,22 @@ namespace Unslop.UnityBridge.Editor.UI
     {
         ProjectBindingService _binding;
         IUnslopApiClient _api;
-        Label _statusLabel;
+        Label _authStatus;
+        Label _projectStatus;
+        Label _correlationStatus;
+        Label _messageLabel;
         TextField _apiKeyField;
+        TextField _apiBaseField;
         ListView _projectList;
         ListView _assetList;
         ListView _versionList;
         ListView _installedList;
         Label _detailLabel;
+
         ProjectDto[] _projects = Array.Empty<ProjectDto>();
         AssetSummaryDto[] _assets = Array.Empty<AssetSummaryDto>();
         AssetVersionSummaryDto[] _versions = Array.Empty<AssetVersionSummaryDto>();
+        bool _busy;
 
         [MenuItem(PackageInfo.MenuRoot + "/Asset Bridge")]
         public static void Open()
@@ -38,7 +46,7 @@ namespace Unslop.UnityBridge.Editor.UI
 
         void OnEnable()
         {
-            _binding = new ProjectBindingService();
+            _binding = BridgeServices.CreateBindingService();
             RefreshApi();
         }
 
@@ -49,64 +57,76 @@ namespace Unslop.UnityBridge.Editor.UI
             rootVisualElement.style.paddingTop = 8;
             rootVisualElement.style.paddingBottom = 8;
 
-            _statusLabel = new Label();
-            _statusLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            _statusLabel.style.marginBottom = 8;
-            rootVisualElement.Add(_statusLabel);
+            rootVisualElement.Add(BuildStatusBar());
+            _messageLabel = new Label(string.Empty);
+            _messageLabel.style.whiteSpace = WhiteSpace.Normal;
+            _messageLabel.style.marginBottom = 8;
+            rootVisualElement.Add(_messageLabel);
 
             var tabs = new TabView();
             tabs.Add(BuildConnectTab());
             tabs.Add(BuildBrowseTab());
             tabs.Add(BuildInstalledTab());
             rootVisualElement.Add(tabs);
+
             RefreshStatus();
             RefreshInstalled();
+        }
+
+        VisualElement BuildStatusBar()
+        {
+            var bar = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    justifyContent = Justify.SpaceBetween,
+                    marginBottom = 6,
+                    paddingBottom = 6,
+                    borderBottomWidth = 1,
+                    borderBottomColor = new Color(0.25f, 0.25f, 0.25f)
+                }
+            };
+            _authStatus = new Label();
+            _projectStatus = new Label();
+            _correlationStatus = new Label();
+            bar.Add(_authStatus);
+            bar.Add(_projectStatus);
+            bar.Add(_correlationStatus);
+            return bar;
         }
 
         Tab BuildConnectTab()
         {
             var tab = new Tab("Connect");
-            var col = new VisualElement();
-            col.style.flexDirection = FlexDirection.Column;
+            var col = new VisualElement { style = { flexDirection = FlexDirection.Column } };
 
-            col.Add(new Label("Bridge API key (stored under Library/Unslop/Auth, never in project files):"));
+            _apiBaseField = new TextField("API Base URL")
+            {
+                value = BridgeServices.Settings.ApiBaseUrl ?? PackageInfo.DefaultApiBaseUrl
+            };
+            col.Add(_apiBaseField);
+
+            col.Add(new Label("Bridge API key (Library/Unslop/Auth only — never logged or committed):"));
             _apiKeyField = new TextField("API Key") { isPasswordField = true };
             col.Add(_apiKeyField);
 
             var row = new VisualElement { style = { flexDirection = FlexDirection.Row, marginTop = 6 } };
-            var saveBtn = new Button(() =>
-            {
-                try
-                {
-                    _binding.SaveApiKey(_apiKeyField.value);
-                    _apiKeyField.value = string.Empty;
-                    RefreshApi();
-                    RefreshStatus();
-                    BridgeLog.Info("Bridge API key saved.");
-                }
-                catch (Exception ex)
-                {
-                    BridgeLog.Exception(ex, "Save API key");
-                    EditorUtility.DisplayDialog("Unslop", ex.Message, "OK");
-                }
-            }) { text = "Save Key" };
-            var clearBtn = new Button(() =>
-            {
-                _binding.SignOut();
-                RefreshStatus();
-                RefreshInstalled();
-            }) { text = "Sign Out" };
-            row.Add(saveBtn);
-            row.Add(clearBtn);
+            row.Add(new Button(OnSaveKey) { text = "Save Key" });
+            row.Add(new Button(OnLogout) { text = "Clear / Logout" });
+            row.Add(new Button(() => _ = LoadProjectsAsync()) { text = "Test Connection" });
             col.Add(row);
 
-            var refreshProjects = new Button(() => _ = LoadProjectsAsync()) { text = "Refresh Projects" };
-            refreshProjects.style.marginTop = 10;
-            col.Add(refreshProjects);
+            var help = new Label($"Default API: {PackageInfo.DefaultApiBaseUrl}");
+            help.style.marginTop = 10;
+            help.style.opacity = 0.75f;
+            col.Add(help);
 
+            col.Add(new Label("Projects (select to bind):") { style = { marginTop = 12, unityFontStyleAndWeight = FontStyle.Bold } });
             _projectList = new ListView
             {
                 fixedItemHeight = 22,
+                selectionType = SelectionType.Single,
                 makeItem = () => new Label(),
                 bindItem = (el, i) =>
                 {
@@ -122,9 +142,18 @@ namespace Unslop.UnityBridge.Editor.UI
                     return;
                 }
 
-                _binding.BindProject(_projects[idx]);
-                RefreshStatus();
-                _ = LoadAssetsAsync();
+                try
+                {
+                    _binding.BindProject(_projects[idx]);
+                    SetMessage($"Bound '{_projects[idx].name}'.");
+                    RefreshStatus();
+                    _ = LoadAssetsAsync();
+                }
+                catch (Exception ex)
+                {
+                    BridgeLog.Exception(ex, "Bind project");
+                    SetMessage(ex.Message);
+                }
             };
             _projectList.style.flexGrow = 1;
             _projectList.style.minHeight = 160;
@@ -138,19 +167,22 @@ namespace Unslop.UnityBridge.Editor.UI
             var tab = new Tab("Browse");
             var root = new VisualElement { style = { flexDirection = FlexDirection.Column, flexGrow = 1 } };
             var buttons = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+            buttons.Add(new Button(() => _ = LoadProjectsAsync()) { text = "Refresh Projects" });
             buttons.Add(new Button(() => _ = LoadAssetsAsync()) { text = "Refresh Assets" });
             buttons.Add(new Button(() => _ = LoadVersionsForSelectionAsync()) { text = "Refresh Versions" });
+            buttons.Add(new Button(() => _ = InstallSelectedAsync()) { text = "Install Selected Version" });
             root.Add(buttons);
 
             var split = new VisualElement { style = { flexDirection = FlexDirection.Row, flexGrow = 1, marginTop = 6 } };
             _assetList = new ListView
             {
                 fixedItemHeight = 28,
+                selectionType = SelectionType.Single,
                 makeItem = () => new Label(),
                 bindItem = (el, i) =>
                 {
                     var a = _assets[i];
-                    var rec = string.IsNullOrEmpty(a.recommended_version_id) ? "no published version" : a.recommended_version_id;
+                    var rec = string.IsNullOrEmpty(a.recommended_version_id) ? "no recommended" : a.recommended_version_id;
                     ((Label)el).text = $"{a.display_name}\n{a.lifecycle} | api={a.api_available} | rec={rec}";
                 }
             };
@@ -162,6 +194,7 @@ namespace Unslop.UnityBridge.Editor.UI
             _versionList = new ListView
             {
                 fixedItemHeight = 22,
+                selectionType = SelectionType.Single,
                 makeItem = () => new Label(),
                 bindItem = (el, i) =>
                 {
@@ -171,8 +204,11 @@ namespace Unslop.UnityBridge.Editor.UI
             };
             _versionList.selectedIndicesChanged += _ => UpdateDetail();
             _detailLabel = new Label("Select an asset/version.") { style = { whiteSpace = WhiteSpace.Normal, marginTop = 8 } };
+            var installBtn = new Button(() => _ = InstallSelectedAsync()) { text = "Install Selected Version" };
+            installBtn.style.marginTop = 8;
             right.Add(_versionList);
             right.Add(_detailLabel);
+            right.Add(installBtn);
 
             split.Add(_assetList);
             split.Add(right);
@@ -192,7 +228,7 @@ namespace Unslop.UnityBridge.Editor.UI
                 makeItem = () => new Label(),
                 bindItem = (el, i) =>
                 {
-                    var items = _installedList.itemsSource as System.Collections.Generic.List<string>;
+                    var items = _installedList.itemsSource as List<string>;
                     ((Label)el).text = items != null && i < items.Count ? items[i] : string.Empty;
                 }
             };
@@ -203,6 +239,73 @@ namespace Unslop.UnityBridge.Editor.UI
             return tab;
         }
 
+        void OnSaveKey()
+        {
+            try
+            {
+                PersistApiBaseFromField();
+                var key = _apiKeyField.value?.Trim();
+                if (string.IsNullOrEmpty(key))
+                {
+                    SetMessage("Enter an API key starting with usk_.");
+                    return;
+                }
+
+                _binding.SaveApiKey(key);
+                _apiKeyField.value = string.Empty;
+                RefreshApi();
+                RefreshStatus();
+                SetMessage("API key saved to local Library store.");
+                BridgeLog.Info("Bridge API key saved.");
+            }
+            catch (Exception ex)
+            {
+                BridgeLog.Exception(ex, "Save API key");
+                SetMessage(ex.Message);
+            }
+        }
+
+        void OnLogout()
+        {
+            _binding.Logout();
+            _apiKeyField.value = string.Empty;
+            _projects = Array.Empty<ProjectDto>();
+            _assets = Array.Empty<AssetSummaryDto>();
+            _versions = Array.Empty<AssetVersionSummaryDto>();
+            if (_projectList != null)
+            {
+                _projectList.itemsSource = _projects;
+                _projectList.RefreshItems();
+            }
+
+            if (_assetList != null)
+            {
+                _assetList.itemsSource = _assets;
+                _assetList.RefreshItems();
+            }
+
+            if (_versionList != null)
+            {
+                _versionList.itemsSource = _versions;
+                _versionList.RefreshItems();
+            }
+
+            RefreshStatus();
+            RefreshInstalled();
+            SetMessage("Logged out. API key cleared.");
+        }
+
+        void PersistApiBaseFromField()
+        {
+            var settings = BridgeServices.Settings;
+            var url = string.IsNullOrWhiteSpace(_apiBaseField?.value)
+                ? PackageInfo.DefaultApiBaseUrl
+                : _apiBaseField.value.TrimEnd('/');
+            settings.ApiBaseUrl = url;
+            EditorUtility.SetDirty(settings);
+            AssetDatabase.SaveAssets();
+        }
+
         void RefreshApi()
         {
             _api = BridgeServices.CreateApiClient();
@@ -210,17 +313,22 @@ namespace Unslop.UnityBridge.Editor.UI
 
         void RefreshStatus()
         {
-            if (_statusLabel == null)
+            if (_authStatus == null)
             {
                 return;
             }
 
-            var auth = _binding.IsAuthenticated ? "authenticated" : "signed out";
-            var project = string.IsNullOrEmpty(_binding.BoundProjectId)
-                ? "no project bound"
-                : $"{_binding.BoundProjectName} ({_binding.BoundProjectId})";
-            var corr = _api?.LastCorrelationId;
-            _statusLabel.text = $"Status: {auth} | Project: {project} | Correlation: {corr ?? "-"} | API: {BridgeServices.Settings.ApiBaseUrl}";
+            var auth = !_binding.IsAuthenticated
+                ? "Auth: signed out"
+                : _binding.NeedsReauthentication
+                    ? "Auth: key rejected (recoverable)"
+                    : "Auth: key present";
+            _authStatus.text = auth;
+            _projectStatus.text = string.IsNullOrEmpty(_binding.BoundProjectId)
+                ? "Project: (none)"
+                : $"Project: {_binding.BoundProjectName} ({_binding.BoundProjectId})";
+            var corr = _api?.LastCorrelationId ?? _binding.LastCorrelationId;
+            _correlationStatus.text = string.IsNullOrEmpty(corr) ? "Correlation: —" : $"Correlation: {corr}";
         }
 
         void RefreshInstalled()
@@ -245,80 +353,139 @@ namespace Unslop.UnityBridge.Editor.UI
 
         async Task LoadProjectsAsync()
         {
+            if (!BeginBusy("Loading projects…"))
+            {
+                return;
+            }
+
             try
             {
+                PersistApiBaseFromField();
                 RefreshApi();
-                var page = await _binding.ListProjectsAsync();
-                _projects = page?.data?.ToArray() ?? Array.Empty<ProjectDto>();
-                _projectList.itemsSource = _projects;
-                _projectList.RefreshItems();
-                RefreshStatus();
+                _binding = BridgeServices.CreateBindingService();
+                var page = await _binding.ListProjectsAsync().ConfigureAwait(true);
+                await ContinueOnMainThread(() =>
+                {
+                    _projects = page?.data?.ToArray() ?? Array.Empty<ProjectDto>();
+                    _projectList.itemsSource = _projects;
+                    _projectList.RefreshItems();
+                    if (_binding.NeedsReauthentication)
+                    {
+                        SetMessage(_binding.LastError);
+                    }
+                    else
+                    {
+                        SetMessage($"Loaded {_projects.Length} project(s).");
+                    }
+
+                    RefreshStatus();
+                });
             }
             catch (Exception ex)
             {
                 BridgeLog.Exception(ex, "List projects");
-                EditorUtility.DisplayDialog("Unslop", BridgeLog.Redact(ex.Message), "OK");
-                RefreshStatus();
+                await ContinueOnMainThread(() => SetMessage(BridgeLog.Redact(ex.Message)));
+            }
+            finally
+            {
+                EndBusy();
             }
         }
 
         async Task LoadAssetsAsync()
         {
+            if (!BeginBusy("Loading assets…"))
+            {
+                return;
+            }
+
             try
             {
                 var projectId = _binding.BoundProjectId;
                 if (string.IsNullOrEmpty(projectId))
                 {
-                    EditorUtility.DisplayDialog("Unslop", "Bind a project first.", "OK");
+                    SetMessage("Bind a project first (Connect tab).");
                     return;
                 }
 
+                PersistApiBaseFromField();
                 RefreshApi();
-                var page = await _api.ListProjectAssetsAsync(projectId);
-                _assets = page?.data?.ToArray() ?? Array.Empty<AssetSummaryDto>();
-                _assetList.itemsSource = _assets;
-                _assetList.RefreshItems();
-                RefreshStatus();
+                var page = await _api.ListProjectAssetsAsync(projectId).ConfigureAwait(true);
+                await ContinueOnMainThread(() =>
+                {
+                    _assets = page?.data?.ToArray() ?? Array.Empty<AssetSummaryDto>();
+                    _assetList.itemsSource = _assets;
+                    _assetList.RefreshItems();
+                    _versions = Array.Empty<AssetVersionSummaryDto>();
+                    _versionList.itemsSource = _versions;
+                    _versionList.RefreshItems();
+                    SetMessage($"Loaded {_assets.Length} asset(s).");
+                    RefreshStatus();
+                });
+            }
+            catch (UnslopApiException ex) when (ex.IsUnauthorized)
+            {
+                await ContinueOnMainThread(() =>
+                {
+                    SetMessage("Authorization failed or was revoked. Update the API key on Connect.");
+                    RefreshStatus();
+                });
             }
             catch (Exception ex)
             {
                 BridgeLog.Exception(ex, "List assets");
-                EditorUtility.DisplayDialog("Unslop", BridgeLog.Redact(ex.Message), "OK");
-                RefreshStatus();
+                await ContinueOnMainThread(() => SetMessage(BridgeLog.Redact(ex.Message)));
+            }
+            finally
+            {
+                EndBusy();
             }
         }
 
         async Task LoadVersionsForSelectionAsync()
         {
+            var idx = _assetList?.selectedIndex ?? -1;
+            if (idx < 0 || idx >= _assets.Length)
+            {
+                return;
+            }
+
+            if (!BeginBusy("Loading versions…"))
+            {
+                return;
+            }
+
             try
             {
-                var idx = _assetList.selectedIndex;
-                if (idx < 0 || idx >= _assets.Length)
-                {
-                    return;
-                }
-
                 RefreshApi();
                 var asset = _assets[idx];
-                var page = await _api.ListAssetVersionsAsync(asset.asset_id);
-                _versions = page?.data?.ToArray() ?? Array.Empty<AssetVersionSummaryDto>();
-                _versionList.itemsSource = _versions;
-                _versionList.RefreshItems();
-                if (_versions.Length == 0)
+                var page = await _api.ListAssetVersionsAsync(asset.asset_id).ConfigureAwait(true);
+                await ContinueOnMainThread(() =>
                 {
-                    _detailLabel.text = $"{asset.display_name}\nNo published versions.";
-                }
-                else
-                {
-                    UpdateDetail();
-                }
+                    _versions = page?.data?.ToArray() ?? Array.Empty<AssetVersionSummaryDto>();
+                    _versionList.itemsSource = _versions;
+                    _versionList.RefreshItems();
+                    if (_versions.Length == 0)
+                    {
+                        _detailLabel.text = $"{asset.display_name}\nNo published versions.";
+                    }
+                    else
+                    {
+                        UpdateDetail();
+                    }
 
-                RefreshStatus();
+                    SetMessage($"Loaded {_versions.Length} version(s).");
+                    RefreshStatus();
+                });
             }
             catch (Exception ex)
             {
                 BridgeLog.Exception(ex, "List versions");
-                RefreshStatus();
+                await ContinueOnMainThread(() => SetMessage(BridgeLog.Redact(ex.Message)));
+            }
+            finally
+            {
+                EndBusy();
             }
         }
 
@@ -340,6 +507,108 @@ namespace Unslop.UnityBridge.Editor.UI
 
             var v = _versions[vIdx];
             _detailLabel.text = $"{asset.display_name}\nv{v.version_number} {v.state}\n{v.asset_version_id}\nmanifest={v.manifest_sha256}\npipeline={v.pipeline_origin}\npublished={v.published_at}";
+        }
+
+        async Task InstallSelectedAsync()
+        {
+            if (!BeginBusy("Installing…"))
+            {
+                return;
+            }
+
+            try
+            {
+                var aIdx = _assetList.selectedIndex;
+                var vIdx = _versionList.selectedIndex;
+                if (aIdx < 0 || aIdx >= _assets.Length)
+                {
+                    SetMessage("Select an asset first.");
+                    return;
+                }
+
+                var asset = _assets[aIdx];
+                var versionId = vIdx >= 0 && vIdx < _versions.Length
+                    ? _versions[vIdx].asset_version_id
+                    : asset.recommended_version_id;
+                if (string.IsNullOrEmpty(versionId))
+                {
+                    SetMessage("No version selected or recommended.");
+                    return;
+                }
+
+                if (!EditorUtility.DisplayDialog("Unslop", $"Install {asset.display_name}\nversion {versionId}?", "Install", "Cancel"))
+                {
+                    return;
+                }
+
+                RefreshApi();
+                var progress = new Progress<string>(SetMessage);
+                await new AssetInstallService(_api).InstallAsync(asset.asset_id, versionId, progress);
+                await ContinueOnMainThread(() =>
+                {
+                    RefreshInstalled();
+                    SetMessage("Install completed.");
+                    EditorUtility.DisplayDialog("Unslop", "Install completed.", "OK");
+                });
+            }
+            catch (Exception ex)
+            {
+                BridgeLog.Exception(ex, "Install");
+                await ContinueOnMainThread(() =>
+                {
+                    SetMessage(BridgeLog.Redact(ex.Message));
+                    EditorUtility.DisplayDialog("Unslop", BridgeLog.Redact(ex.Message), "OK");
+                });
+            }
+            finally
+            {
+                EndBusy();
+            }
+        }
+
+        void SetMessage(string message)
+        {
+            if (_messageLabel != null)
+            {
+                _messageLabel.text = message ?? string.Empty;
+            }
+        }
+
+        bool BeginBusy(string message)
+        {
+            if (_busy)
+            {
+                SetMessage("Please wait for the current request to finish.");
+                return false;
+            }
+
+            _busy = true;
+            SetMessage(message);
+            return true;
+        }
+
+        void EndBusy()
+        {
+            _busy = false;
+            EditorApplication.delayCall += RefreshStatus;
+        }
+
+        static Task ContinueOnMainThread(Action action)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            EditorApplication.delayCall += () =>
+            {
+                try
+                {
+                    action();
+                    tcs.TrySetResult(true);
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            };
+            return tcs.Task;
         }
     }
 }

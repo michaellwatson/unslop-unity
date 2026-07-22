@@ -84,6 +84,7 @@ namespace Unslop.UnityBridge.Editor.Api
         public string display_name;
         public string content_kind;
         public string minimum_bridge_version;
+        public string physical_spec_id_at_publish;
         public ModelManifestDto model;
         public CompatibilityDeclarationDto compatibility;
         public List<ManifestFileDto> files = new List<ManifestFileDto>();
