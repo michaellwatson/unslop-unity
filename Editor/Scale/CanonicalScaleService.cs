@@ -119,6 +119,20 @@ namespace Unslop.UnityBridge.Editor.Scale
                     Guid.NewGuid().ToString("N"),
                     cancellationToken);
 
+                var specId = revision?.ResolvedId;
+                if (string.IsNullOrWhiteSpace(specId))
+                {
+                    // Fallback: re-read asset pointer if create response omitted the id field.
+                    var refreshed = await _api.GetAssetAsync(reference.AssetId, cancellationToken);
+                    specId = refreshed?.current_physical_spec_id;
+                }
+
+                if (string.IsNullOrWhiteSpace(specId))
+                {
+                    throw new InvalidOperationException(
+                        "Canonical size was accepted but the API did not return a physical_spec_id. Refresh the asset and try Confirm Scale after the Physical Spec Id appears.");
+                }
+
                 if (visual != null)
                 {
                     // Transfer: after canonical write, visual correction resets to 1 so scale does not compound.
@@ -128,7 +142,7 @@ namespace Unslop.UnityBridge.Editor.Scale
 
                 if (localMeta != null)
                 {
-                    localMeta.physical_spec_id = revision.physical_spec_id;
+                    localMeta.physical_spec_id = specId;
                     localMeta.visual_correction = new[] { 1f, 1f, 1f };
                     LockFileService.SaveLocalMetadata(localMeta);
                 }
@@ -136,29 +150,30 @@ namespace Unslop.UnityBridge.Editor.Scale
                 var lockFile = LockFileService.LoadOrCreate(settings.BoundProjectId, settings.Environment);
                 if (lockFile.assets.TryGetValue(reference.AssetId, out var entry))
                 {
-                    entry.physical_spec_id = revision.physical_spec_id;
+                    entry.physical_spec_id = specId;
                     LockFileService.UpsertAsset(lockFile, reference.AssetId, entry);
                 }
 
                 reference.Configure(
                     reference.AssetId,
                     reference.InstalledVersionId,
-                    revision.physical_spec_id,
+                    specId,
                     reference.WrapperPrefabGuid);
                 EditorUtility.SetDirty(reference);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(reference);
 
                 BridgeLog.Info(
-                    $"Canonical scale written for {reference.AssetId} spec={revision.physical_spec_id} pending={revision.artist_correction_pending}");
+                    $"Canonical scale written for {reference.AssetId} spec={specId} pending={revision?.artist_correction_pending}");
 
                 return new CanonicalScaleResult
                 {
                     Revision = revision,
                     MeasuredMetres = measured.SizeMetres,
                     AppliedVisualCorrection = Vector3.one,
-                    ArtistCorrectionPending = revision.artist_correction_pending,
-                    Message = revision.artist_correction_pending
-                        ? "Canonical size set. Artist correction pending on server."
-                        : "Canonical size set."
+                    ArtistCorrectionPending = revision != null && revision.artist_correction_pending,
+                    Message = revision != null && revision.artist_correction_pending
+                        ? $"Canonical size set (spec {ShortId(specId)}). Artist correction pending on server — you can still Confirm Scale in Unity."
+                        : $"Canonical size set (spec {ShortId(specId)})."
                 };
             }
             catch (UnslopApiException ex) when (ex.IsPreconditionFailed)
@@ -171,6 +186,16 @@ namespace Unslop.UnityBridge.Editor.Scale
                     Message = "Physical spec changed remotely (HTTP 412). Refresh and retry with the latest ETag — local size was not overwritten."
                 };
             }
+        }
+
+        static string ShortId(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return "—";
+            }
+
+            return id.Length <= 12 ? id : id.Substring(0, 8) + "…" + id.Substring(id.Length - 4);
         }
     }
 }

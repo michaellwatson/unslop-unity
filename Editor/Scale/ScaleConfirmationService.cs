@@ -11,6 +11,7 @@ using Unslop.UnityBridge.Editor.Importing;
 using Unslop.UnityBridge.Editor.Locking;
 using Unslop.UnityBridge.Editor.Services;
 using Unslop.UnityBridge.Editor.Settings;
+using UnityEditor;
 using UnityEngine;
 
 namespace Unslop.UnityBridge.Editor.Scale
@@ -70,28 +71,96 @@ namespace Unslop.UnityBridge.Editor.Scale
             var settings = UnslopProjectSettings.EnsureExists();
             var lockFile = LockFileService.LoadOrCreate(settings.BoundProjectId, settings.Environment);
             lockFile.assets.TryGetValue(reference.AssetId, out var entry);
+            var localMeta = LockFileService.LoadLocalMetadata(reference.AssetId);
+
+            var versionId = FirstNonEmpty(
+                reference.InstalledVersionId,
+                entry?.installed_version_id);
+            var physicalSpecId = FirstNonEmpty(
+                reference.PhysicalSpecId,
+                entry?.physical_spec_id,
+                localMeta?.physical_spec_id);
+
+            if (string.IsNullOrWhiteSpace(physicalSpecId))
+            {
+                // After Set Canonical Scale the asset pointer should hold the new spec.
+                try
+                {
+                    var asset = await _api.GetAssetAsync(reference.AssetId, cancellationToken);
+                    physicalSpecId = asset?.current_physical_spec_id;
+                    if (string.IsNullOrWhiteSpace(physicalSpecId))
+                    {
+                        var revisions = await _api.ListPhysicalSpecRevisionsAsync(
+                            reference.AssetId, null, cancellationToken);
+                        physicalSpecId = revisions?.data?.FirstOrDefault()?.ResolvedId;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    BridgeLog.Warn("Could not resolve physical_spec_id before confirm: " + BridgeLog.Redact(ex.Message));
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(physicalSpecId))
+            {
+                throw new InvalidOperationException(
+                    "Confirm Scale needs a physical_spec_id. Run Set Canonical Scale first, then Confirm Scale once Physical Spec Id is filled in on UnslopAssetReference.");
+            }
+
+            if (string.IsNullOrWhiteSpace(versionId))
+            {
+                throw new InvalidOperationException("Confirm Scale needs an installed version id on the wrapper.");
+            }
+
+            // Persist resolved id onto the wrapper so the Inspector stops showing empty.
+            if (!string.Equals(reference.PhysicalSpecId, physicalSpecId, StringComparison.Ordinal))
+            {
+                reference.Configure(
+                    reference.AssetId,
+                    versionId,
+                    physicalSpecId,
+                    reference.WrapperPrefabGuid);
+                EditorUtility.SetDirty(reference);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(reference);
+            }
 
             var measured = _measurement.MeasureRendererBounds(wrapperInstance);
             var tolerance = _measurement.DefaultToleranceMetres;
+            var client = BridgeServices.CreateClientContext();
             var request = new ScaleConfirmationCreateDto
             {
-                asset_version_id = reference.InstalledVersionId,
-                physical_spec_id = reference.PhysicalSpecId ?? entry?.physical_spec_id,
+                asset_version_id = versionId,
+                physical_spec_id = physicalSpecId,
                 engine = "unity",
                 measured_dimensions_metres = measured.ToArray(),
                 tolerance_metres = new[] { tolerance.x, tolerance.y, tolerance.z },
+                engine_version = Application.unityVersion,
                 unity_version = Application.unityVersion,
                 bridge_version = BridgePackageInfo.Version,
-                render_pipeline = BridgeServices.CreateClientContext().render_pipeline,
+                render_backend = client.render_pipeline,
+                render_pipeline = client.render_pipeline,
                 import_profile_hash = entry?.import_profile_hash ?? ImportProfile.ComputeImportProfileHash(),
-                project_id = settings.BoundProjectId
+                project_id = settings.BoundProjectId,
+                client = client
             };
 
-            var confirmation = await _api.SubmitScaleConfirmationAsync(
-                reference.AssetId,
-                request,
-                Guid.NewGuid().ToString("N"),
-                cancellationToken);
+            ScaleConfirmationDto confirmation;
+            try
+            {
+                confirmation = await _api.SubmitScaleConfirmationAsync(
+                    reference.AssetId,
+                    request,
+                    Guid.NewGuid().ToString("N"),
+                    cancellationToken);
+            }
+            catch (UnslopApiException ex) when (ex.StatusCode == 404)
+            {
+                throw new InvalidOperationException(
+                    "Scale confirmation endpoint returned 404. Usually the physical_spec_id is missing or unknown to the server. " +
+                    $"Tried spec={physicalSpecId}, version={versionId}. Re-run Set Canonical Scale, then Confirm Scale again. " +
+                    $"API detail: {ex.Message}",
+                    ex);
+            }
 
             var derived = await DeriveStatusAsync(reference, entry, cancellationToken);
             var badge = confirmation?.badge?.label
@@ -106,6 +175,19 @@ namespace Unslop.UnityBridge.Editor.Scale
                 Measurement = measured,
                 Message = $"Confirmation status={confirmation?.status ?? "unknown"}; derived={derived}"
             };
+        }
+
+        static string FirstNonEmpty(params string[] values)
+        {
+            foreach (var value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value.Trim();
+                }
+            }
+
+            return null;
         }
 
         public async Task<ScaleConfirmationDerivedStatus> DeriveStatusAsync(

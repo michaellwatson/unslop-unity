@@ -267,12 +267,17 @@ namespace Unslop.UnityBridge.Editor.Api
     public sealed class PhysicalSpecRevisionDto
     {
         public string physical_spec_id;
+        /// <summary>Some API responses use <c>id</c> instead of <c>physical_spec_id</c>.</summary>
+        public string id;
         public float[] dimensions_metres;
         public string up_axis;
         public string forward_axis;
         public string pivot_policy;
         public string etag;
         public bool artist_correction_pending;
+
+        public string ResolvedId =>
+            !string.IsNullOrWhiteSpace(physical_spec_id) ? physical_spec_id : id;
     }
 
     [Serializable]
@@ -313,11 +318,18 @@ namespace Unslop.UnityBridge.Editor.Api
         public string engine = "unity";
         public float[] measured_dimensions_metres;
         public float[] tolerance_metres;
+        /// <summary>OpenAPI field (preferred).</summary>
+        public string engine_version;
+        /// <summary>Legacy alias still accepted by some servers.</summary>
         public string unity_version;
         public string bridge_version;
+        /// <summary>OpenAPI field (preferred).</summary>
+        public string render_backend;
+        /// <summary>Legacy alias.</summary>
         public string render_pipeline = "urp";
         public string import_profile_hash;
         public string project_id;
+        public ClientContextDto client;
     }
 
     [Serializable]
