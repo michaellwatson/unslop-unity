@@ -63,5 +63,49 @@ namespace Unslop.UnityBridge.Editor.Tests
             Assert.That(report.IsValid, Is.False);
             Assert.That(string.Join(" ", report.Errors), Does.Contain("Forbidden"));
         }
+
+        [Test]
+        public void RejectsDllAndUnknownRole()
+        {
+            var manifest = new AssetVersionManifest
+            {
+                schema_version = 1,
+                asset_id = "a",
+                asset_version_id = "v",
+                display_name = "t",
+                content_kind = "static_mesh",
+                minimum_bridge_version = "1.0.0",
+                model = new ModelManifest { file_id = "m", relative_path = "model.fbx", format = "fbx" },
+                files =
+                {
+                    new ManifestFile
+                    {
+                        file_id = "m", role = "model", relative_path = "model.fbx", byte_length = 10,
+                        sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    },
+                    new ManifestFile
+                    {
+                        file_id = "d", role = "script", relative_path = "hack.dll", byte_length = 10,
+                        sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                    }
+                }
+            };
+            var report = new ManifestValidator().ValidateManifest(manifest);
+            Assert.That(report.IsValid, Is.False);
+            var errors = string.Join(" ", report.Errors);
+            Assert.That(
+                errors.Contains("Unsupported file role") || errors.Contains("Forbidden"),
+                Is.True,
+                errors);
+        }
+
+        [Test]
+        public void HashHelpers_RoundTrip()
+        {
+            var hex = ManifestValidator.ComputeSha256Hex("latch");
+            Assert.That(hex.Length, Is.EqualTo(64));
+            Assert.That(ManifestValidator.IsValidSha256(hex), Is.True);
+            Assert.That(ManifestValidator.FormatSha256Uri(hex), Does.StartWith("sha256:"));
+        }
     }
 }

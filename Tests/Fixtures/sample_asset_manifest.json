@@ -12,7 +12,8 @@
     "format": "fbx",
     "source_up_axis": "Y",
     "source_forward_axis": "Z",
-    "source_units": "metres"
+    "source_units": "metres",
+    "expected_root_name": "LatchLarge"
   },
   "compatibility": {
     "classification": "compatible",
@@ -36,6 +37,30 @@
       "media_type": "image/png",
       "byte_length": 25315050,
       "sha256": "12462738fb65b8ed6f3e0fbce5d4bb88ad6d19fdd737a9ab8a857812f3a5af51"
+    },
+    {
+      "file_id": "a1111111-0b58-4a74-910a-e04e906a9482",
+      "role": "texture",
+      "relative_path": "textures/normal.png",
+      "media_type": "image/png",
+      "byte_length": 16777216,
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "file_id": "a1111111-0b58-4a74-910a-e04e906a9483",
+      "role": "texture",
+      "relative_path": "textures/roughness.png",
+      "media_type": "image/png",
+      "byte_length": 8388608,
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "file_id": "b2222222-0b58-4a74-910a-e04e906a9484",
+      "role": "preview",
+      "relative_path": "preview.png",
+      "media_type": "image/png",
+      "byte_length": 262144,
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
     },
     {
       "file_id": "de158aee-9b29-4205-83d5-92f80fc2dc68",

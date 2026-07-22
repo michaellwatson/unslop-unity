@@ -2,14 +2,11 @@
 
 Install via Unity Package Manager (disk or git URL). See the repository [README.md](../README.md).
 
-## Supported matrix
+## Guides
 
-| Item | MVP |
-|---|---|
-| Unity | 6000.0+ |
-| Render pipeline | URP (HDRP later) |
-| Content | Static FBX + textures + materials.json |
-| Auth | Bridge API key (`usk_…`) |
+- [User guide](user-guide.md)
+- [Artist guide](artist-guide.md)
+- [Supported matrix](supported-matrix.md)
 
 ## User guide topics
 
