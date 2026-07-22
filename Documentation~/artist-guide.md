@@ -35,11 +35,13 @@ Artists publish FBX + textures + `materials.json` + manifests through Unslop (no
 ## Wrapper hierarchy (do not rename)
 
 ```
-UnslopAssetRoot          ← UnslopAssetReference
+UnslopAssetRoot          ← UnslopAssetReference (scene placement lives here)
 ├── VisualCorrection     ← scale correction only
 │   └── Model
-│       └── Visual (nested prefab)
+│       └── Visual (nested prefab — refreshed on version update)
 └── UserContent          ← put sockets / gameplay attachments here
 ```
 
 Renaming these nodes breaks update preservation and scale measurement.
+
+Version updates refresh the Visual nested content **in place**. Scene instances keep their root transform / parenting; you should not need to re-place the asset after install.

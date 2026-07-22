@@ -259,6 +259,7 @@ namespace Unslop.UnityBridge.Editor.Transactions
                 TransactionJournal.Advance(journal, TransactionPhases.Regenerated);
 
                 var physicalSpecId = session.PreviousEntry?.physical_spec_id;
+                var poses = SceneInstancePosePreserver.Capture(journal.asset_id);
                 var wrapper = WrapperPrefabBuilder.Build(
                     journal.asset_id,
                     journal.to_version_id,
@@ -273,6 +274,8 @@ namespace Unslop.UnityBridge.Editor.Transactions
                     BridgeLog.Warn(
                         $"Wrapper GUID changed during accept: {journal.wrapper_prefab_guid} → {wrapper.WrapperPrefabGuid}");
                 }
+
+                SceneInstancePosePreserver.Restore(journal.asset_id, poses);
 
                 var lockEntry = new LockAssetEntry
                 {

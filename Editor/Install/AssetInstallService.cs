@@ -94,6 +94,7 @@ namespace Unslop.UnityBridge.Editor.Install
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
             status?.Report("Building wrapper prefabs…");
+            var poses = SceneInstancePosePreserver.Capture(assetId);
             var modelPathForPrefab = File.Exists(ToFull(installedModelPath)) ? installedModelPath : staging.ModelAssetPath;
             var physicalSpecId = await SafePhysicalSpecId(assetId, cancellationToken);
             var displayName = download.Manifest?.display_name;
@@ -109,6 +110,8 @@ namespace Unslop.UnityBridge.Editor.Install
                 wrapper.VisualPrefabPath,
                 download.Materials,
                 materials.MaterialPathsById);
+
+            SceneInstancePosePreserver.Restore(assetId, poses);
 
             var lockEntry = new LockAssetEntry
             {
