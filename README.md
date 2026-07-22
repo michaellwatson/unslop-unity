@@ -5,29 +5,25 @@ UPM package `com.unslop.unity-bridge` for Unity 6+ (URP). Synchronises Unslop st
 ## Requirements
 
 - Unity **6000.0** or newer
-- **Universal Render Pipeline (URP)** for automatic material generation (HDRP adapter is reserved for later)
+- **Universal Render Pipeline (URP)** recommended for automatic material generation (detected at runtime; not a hard Package Manager dependency). HDRP adapter is reserved for later.
 - An Unslop Bridge API key (`usk_…`) from your project page
+
+> Install this package into an existing Unity project. Do **not** open this git repository as the Unity project root.
 
 ## Install via Unity Package Manager
 
-### From disk (local clone)
-
-1. Clone this repository.
-2. In Unity: **Window → Package Manager → + → Add package from disk…**
-3. Select the `package.json` at the root of this repository.
-
-### From Git URL
+### From Git URL (recommended)
 
 **Window → Package Manager → + → Add package from git URL…**
 
 ```text
-https://github.com/<org>/unslop-unity.git
+https://github.com/unslop/unslop-unity.git
 ```
 
 Optional pin:
 
 ```text
-https://github.com/<org>/unslop-unity.git#v1.0.0
+https://github.com/unslop/unslop-unity.git#v1.0.0
 ```
 
 ### From `manifest.json`
@@ -35,10 +31,16 @@ https://github.com/<org>/unslop-unity.git#v1.0.0
 ```json
 {
   "dependencies": {
-    "com.unslop.unity-bridge": "https://github.com/<org>/unslop-unity.git"
+    "com.unslop.unity-bridge": "https://github.com/unslop/unslop-unity.git"
   }
 }
 ```
+
+### From disk (local clone)
+
+1. Clone this repository.
+2. In Unity: **Window → Package Manager → + → Add package from disk…**
+3. Select the `package.json` at the root of this repository.
 
 ## Quick start
 

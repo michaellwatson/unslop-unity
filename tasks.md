@@ -13,7 +13,7 @@
 - [x] Phase F — Hardening
 
 ## Active work
-- None — MVP on `main` (ahead of origin); remaining verify is Unity Editor compile/import
+- UPM git-install readiness: ship `.meta` files, soft URP dep, `scripts~` — re-add package in a Unity 6 URP project and confirm **Unslop → Asset Bridge**
 
 ## Agents
 - [Phase A implementer](10eb6673-3903-4164-a113-c196e0dc5ac8) — completed

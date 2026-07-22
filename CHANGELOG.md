@@ -13,3 +13,8 @@
 - Material ownership modes and conflict resolutions
 - Bidirectional canonical scale and Unity scale confirmation
 - Rollback, pins, drift diagnostics, and support export
+
+### Fixed
+- Ship Unity `.meta` files so git/Package Manager installs are not treated as incomplete immutable packages
+- Drop hard URP package/asmdef dependency; detect URP via `Shader.Find` and optional `UNSLOP_HAS_URP` versionDefine
+- Keep helper Python tooling under `scripts~` so Unity does not import it

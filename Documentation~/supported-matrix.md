@@ -3,7 +3,7 @@
 | Area | Supported | Notes |
 |---|---|---|
 | Unity | 6000.0+ | Package `"unity": "6000.0"` |
-| Render pipeline | URP | HDRP adapter is a placeholder (textures import; auto materials unavailable) |
+| Render pipeline | URP (soft) | Detected via Lit shader / `UNSLOP_HAS_URP`; not a hard package dependency. HDRP adapter is a placeholder |
 | Content | Static FBX + textures + `materials.json` | No scripts, DLLs, shaders, or compute in packages |
 | Texture formats | png, jpg, jpeg, tga, tif/tiff, exr | Colour / normal / roughness roles |
 | Auth | Bridge API key `usk_…` | Stored in `Library/Unslop/Auth` only |

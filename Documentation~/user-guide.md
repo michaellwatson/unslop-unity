@@ -2,8 +2,8 @@
 
 ## Install the package
 
-1. Unity 6.0+ project with **URP**.
-2. Package Manager → **Add package from disk** (repo root) or **Add package from git URL**.
+1. Unity 6.0+ project (URP recommended for automatic materials).
+2. Package Manager → **Add package from git URL** (`https://github.com/unslop/unslop-unity.git`) or **Add package from disk** (repo `package.json`). Do not open this repo as the Unity project root.
 3. Open **Unslop → Asset Bridge**.
 
 ## Connect and bind
