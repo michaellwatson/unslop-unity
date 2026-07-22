@@ -73,7 +73,8 @@ namespace Unslop.UnityBridge.Editor.Importing
                 UnityEngine.Object.DestroyImmediate(visualRoot);
             }
 
-            var wrapperRoot = new GameObject(RootName);
+            var wrapperRoot = new GameObject(
+                string.IsNullOrWhiteSpace(displayName) ? RootName : SanitizeHierarchyName(displayName));
             try
             {
                 var visualCorrection = new GameObject(VisualCorrectionName);
@@ -94,7 +95,6 @@ namespace Unslop.UnityBridge.Editor.Importing
                 userContent.transform.SetParent(wrapperRoot.transform, false);
 
                 var reference = wrapperRoot.AddComponent<UnslopAssetReference>();
-                var visualGuid = AssetDatabase.AssetPathToGUID(visualPath);
                 // Wrapper GUID is unknown until saved; configure after save.
                 reference.Configure(assetId, versionId, physicalSpecId ?? string.Empty, string.Empty);
 
@@ -138,6 +138,16 @@ namespace Unslop.UnityBridge.Editor.Importing
                 WrapperPrefabGuid = wrapperGuid,
                 SourceFbxGuid = sourceFbxGuid
             };
+        }
+
+        static string SanitizeHierarchyName(string name)
+        {
+            foreach (var c in System.IO.Path.GetInvalidFileNameChars())
+            {
+                name = name.Replace(c, '_');
+            }
+
+            return string.IsNullOrWhiteSpace(name) ? RootName : name.Trim();
         }
 
         /// <summary>

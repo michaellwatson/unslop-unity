@@ -24,6 +24,7 @@ namespace Unslop.UnityBridge.Editor.Locking
         public string source_fbx_guid = string.Empty;
         public string import_profile_hash = string.Empty;
         public string manifest_sha256 = string.Empty;
+        public string display_name = string.Empty;
         public string state_hash = string.Empty;
         public LockPin pin;
         public Dictionary<string, LockMaterialBinding> material_bindings = new Dictionary<string, LockMaterialBinding>();
@@ -50,6 +51,7 @@ namespace Unslop.UnityBridge.Editor.Locking
     {
         public int schema_version = 1;
         public string asset_id = string.Empty;
+        public string display_name = string.Empty;
         public string installed_version_id = string.Empty;
         public string physical_spec_id = string.Empty;
         public float[] visual_correction = { 1f, 1f, 1f };

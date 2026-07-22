@@ -96,12 +96,19 @@ namespace Unslop.UnityBridge.Editor.Install
             status?.Report("Building wrapper prefabs…");
             var modelPathForPrefab = File.Exists(ToFull(installedModelPath)) ? installedModelPath : staging.ModelAssetPath;
             var physicalSpecId = await SafePhysicalSpecId(assetId, cancellationToken);
+            var displayName = download.Manifest?.display_name;
             var wrapper = WrapperPrefabBuilder.Build(
                 assetId,
                 versionId,
                 physicalSpecId,
                 modelPathForPrefab,
-                download.Manifest.display_name);
+                displayName);
+
+            status?.Report("Assigning materials to Visual…");
+            MaterialSlotApplicator.ApplyToPrefab(
+                wrapper.VisualPrefabPath,
+                download.Materials,
+                materials.MaterialPathsById);
 
             var lockEntry = new LockAssetEntry
             {
@@ -113,6 +120,7 @@ namespace Unslop.UnityBridge.Editor.Install
                 source_fbx_guid = wrapper.SourceFbxGuid,
                 import_profile_hash = staging.ImportProfileHash,
                 manifest_sha256 = download.ManifestSha256,
+                display_name = displayName ?? string.Empty,
                 material_bindings = materials.Bindings
             };
 
@@ -123,6 +131,7 @@ namespace Unslop.UnityBridge.Editor.Install
             {
                 schema_version = 1,
                 asset_id = assetId,
+                display_name = displayName ?? string.Empty,
                 installed_version_id = versionId,
                 physical_spec_id = physicalSpecId ?? string.Empty,
                 visual_correction = new[] { 1f, 1f, 1f },

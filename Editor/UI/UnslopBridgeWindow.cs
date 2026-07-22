@@ -117,12 +117,14 @@ namespace Unslop.UnityBridge.Editor.UI
             var row = new VisualElement { style = { flexDirection = FlexDirection.Row, marginTop = 6 } };
             row.Add(new Button(OnSaveKey) { text = "Save Key" });
             row.Add(new Button(OnLogout) { text = "Clear / Logout" });
-            row.Add(new Button(() => _ = LoadProjectsAsync()) { text = "Test Connection" });
+            row.Add(new Button(() => _ = TestConnectionAsync()) { text = "Test Connection" });
             col.Add(row);
 
-            var help = new Label($"Default API: {BridgePackageInfo.DefaultApiBaseUrl}");
+            var help = new Label(
+                $"Paste usk_… then Test Connection (saves the key automatically). Default API: {BridgePackageInfo.DefaultApiBaseUrl}");
             help.style.marginTop = 10;
             help.style.opacity = 0.75f;
+            help.style.whiteSpace = WhiteSpace.Normal;
             col.Add(help);
 
             col.Add(new Label("Projects (select to bind):") { style = { marginTop = 12, unityFontStyleAndWeight = FontStyle.Bold } });
@@ -252,24 +254,78 @@ namespace Unslop.UnityBridge.Editor.UI
         {
             try
             {
-                PersistApiBaseFromField();
-                var key = _apiKeyField.value?.Trim();
-                if (string.IsNullOrEmpty(key))
+                if (!TryPersistKeyFromField(requireFieldValue: true, out var error))
                 {
-                    SetMessage("Enter an API key starting with usk_.");
+                    SetMessage(error);
                     return;
                 }
 
-                _binding.SaveApiKey(key);
                 _apiKeyField.value = string.Empty;
                 RefreshApi();
                 RefreshStatus();
-                SetMessage("API key saved to local Library store.");
+                SetMessage("API key saved to local Library store. Click Test Connection to list projects.");
                 BridgeLog.Info("Bridge API key saved.");
             }
             catch (Exception ex)
             {
                 BridgeLog.Exception(ex, "Save API key");
+                SetMessage(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Persist API base + optional key typed in the field. Test Connection must save first —
+        /// the API client only reads the Library store, not the TextField.
+        /// </summary>
+        bool TryPersistKeyFromField(bool requireFieldValue, out string error)
+        {
+            error = null;
+            PersistApiBaseFromField();
+            var key = _apiKeyField?.value?.Trim();
+            if (string.IsNullOrEmpty(key))
+            {
+                if (requireFieldValue)
+                {
+                    error = "Enter an API key starting with usk_.";
+                    return false;
+                }
+
+                return true;
+            }
+
+            _binding.SaveApiKey(key);
+            return true;
+        }
+
+        async Task TestConnectionAsync()
+        {
+            try
+            {
+                // Always take the field value if present — users expect "paste then test" to work.
+                if (!TryPersistKeyFromField(requireFieldValue: false, out var persistError))
+                {
+                    SetMessage(persistError);
+                    return;
+                }
+
+                if (!_binding.IsAuthenticated)
+                {
+                    SetMessage("Paste a Bridge API key starting with usk_, then click Test Connection.");
+                    RefreshStatus();
+                    return;
+                }
+
+                // Clear the field only after we know a key is stored (security).
+                if (!string.IsNullOrEmpty(_apiKeyField?.value))
+                {
+                    _apiKeyField.value = string.Empty;
+                }
+
+                await LoadProjectsAsync();
+            }
+            catch (Exception ex)
+            {
+                BridgeLog.Exception(ex, "Test connection");
                 SetMessage(ex.Message);
             }
         }
@@ -350,7 +406,10 @@ namespace Unslop.UnityBridge.Editor.UI
             var settings = BridgeServices.Settings;
             var lockFile = LockFileService.LoadOrCreate(settings.BoundProjectId, settings.Environment);
             var lines = lockFile.assets.Select(kv =>
-                $"{kv.Key}\nversion={kv.Value.installed_version_id}  physical={kv.Value.physical_spec_id}  wrapper={kv.Value.wrapper_prefab_guid}").ToList();
+            {
+                var name = string.IsNullOrWhiteSpace(kv.Value.display_name) ? kv.Key : kv.Value.display_name;
+                return $"{name}\nid={ShortId(kv.Key)}  version={ShortId(kv.Value.installed_version_id)}  physical={ShortId(kv.Value.physical_spec_id)}";
+            }).ToList();
             if (lines.Count == 0)
             {
                 lines.Add("No installed assets in Unslop.lock.json yet.");
@@ -358,6 +417,16 @@ namespace Unslop.UnityBridge.Editor.UI
 
             _installedList.itemsSource = lines;
             _installedList.RefreshItems();
+        }
+
+        static string ShortId(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return "—";
+            }
+
+            return id.Length <= 12 ? id : id.Substring(0, 8) + "…" + id.Substring(id.Length - 4);
         }
 
         async Task LoadProjectsAsync()
@@ -369,7 +438,15 @@ namespace Unslop.UnityBridge.Editor.UI
 
             try
             {
-                PersistApiBaseFromField();
+                // Refresh Projects on Browse should also pick up a newly typed key.
+                TryPersistKeyFromField(requireFieldValue: false, out _);
+                if (!_binding.IsAuthenticated)
+                {
+                    SetMessage("No API key saved. Paste usk_… on Connect and click Test Connection.");
+                    RefreshStatus();
+                    return;
+                }
+
                 RefreshApi();
                 _binding = BridgeServices.CreateBindingService();
                 var page = await _binding.ListProjectsAsync().ConfigureAwait(true);
@@ -380,11 +457,15 @@ namespace Unslop.UnityBridge.Editor.UI
                     _projectList.RefreshItems();
                     if (_binding.NeedsReauthentication)
                     {
-                        SetMessage(_binding.LastError);
+                        SetMessage(_binding.LastError ?? "Authorization failed. Re-paste the key and Test Connection again.");
+                    }
+                    else if (_projects.Length == 0)
+                    {
+                        SetMessage("Connected, but no projects were returned for this key.");
                     }
                     else
                     {
-                        SetMessage($"Loaded {_projects.Length} project(s).");
+                        SetMessage($"Connected — loaded {_projects.Length} project(s). Select one to bind.");
                     }
 
                     RefreshStatus();

@@ -8,16 +8,17 @@
 
 ## Connect and bind
 
-1. On **Connect**, paste a Bridge API key (`usk_…`). Keys are stored under `Library/Unslop/Auth` only — never in the project, lock file, or logs.
-2. **Test Connection**, then select a project to bind.
-3. If a key is revoked, the UI shows a recoverable auth state — enter a new key without losing installed assets.
+1. On **Connect**, paste a Bridge API key (`usk_…`).
+2. Click **Test Connection** (this saves the key into `Library/Unslop/Auth` automatically, then lists projects). You can also use **Save Key** first.
+3. Select a project in the list to bind it.
+4. If a key is revoked, the UI shows a recoverable auth state — paste a new key and Test Connection again without losing installed assets.
 
 ## Browse and install
 
-1. Open **Browse**, refresh assets, select an asset and published version.
+1. Open **Browse** → **Refresh Assets**, select an asset and a published version.
 2. Click **Install Selected Version**.
-3. The bridge downloads with hash verification, stages under `Assets/Unslop/__Staging`, generates URP materials, and builds a stable wrapper prefab under `Assets/Unslop/Installed/<assetId>/Prefabs/`.
-4. Place `Asset.prefab` in your scene. References survive Editor reload via preserved GUIDs.
+3. The bridge downloads with hash verification, stages under `Assets/Unslop/__Staging`, generates URP materials, and builds a stable wrapper prefab under `Assets/Unslop/Installed/<assetId>/Prefabs/Asset.prefab`.
+4. Drag **`Asset.prefab`** (not the raw FBX) into your scene. Keep the `UnslopAssetReference` component — scale/update tools look for it.
 
 ## Check updates (staged acceptance)
 
@@ -39,9 +40,11 @@ Local overrides are never overwritten on update or rollback unless you choose Ac
 
 ## Scale
 
-1. Select a wrapper instance in the scene.
-2. **Set Canonical Scale** measures renderer bounds and writes a physical-spec revision (`If-Match` ETag; HTTP 412 means refresh and retry).
-3. **Confirm Scale** submits measurement evidence and shows an online confirmation badge.
+1. Drag `Assets/Unslop/Installed/<assetId>/Prefabs/Asset.prefab` into the scene (or select that instance / prefab in the Hierarchy / Project).
+2. With the wrapper selected, click **Set Canonical Scale** — measures renderer bounds and writes a physical-spec revision online (`If-Match` ETag; HTTP 412 means refresh and retry).
+3. Then click **Confirm Scale** — submits Unity measurement evidence and shows an online confirmation badge.
+
+You must have a scene/project selection that carries `UnslopAssetReference` (the wrapper), not just the FBX mesh.
 
 ## Rollback, pins, drift
 
