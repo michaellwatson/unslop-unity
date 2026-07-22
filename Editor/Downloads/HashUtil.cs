@@ -52,6 +52,17 @@ namespace Unslop.UnityBridge.Editor.Downloads
 
         public static bool EqualsSha256(string expected, string actual) => EqualsHash(expected, actual);
 
+        public static string ShortHash(string sha256)
+        {
+            var hex = Normalize(sha256);
+            if (string.IsNullOrEmpty(hex))
+            {
+                return "(none)";
+            }
+
+            return hex.Length <= 12 ? hex : hex.Substring(0, 8) + "…" + hex.Substring(hex.Length - 4);
+        }
+
         public static string Normalize(string hash)
         {
             if (string.IsNullOrWhiteSpace(hash))

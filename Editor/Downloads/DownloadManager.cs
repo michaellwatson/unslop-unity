@@ -128,12 +128,18 @@ namespace Unslop.UnityBridge.Editor.Downloads
                 existing = new FileInfo(destPath).Length;
                 if (existing == file.byte_length)
                 {
-                    if (HashUtil.EqualsHash(file.sha256, HashUtil.Sha256File(destPath)))
+                    var actualHash = HashUtil.Sha256File(destPath);
+                    if (HashUtil.EqualsHash(file.sha256, actualHash))
                     {
-                        BridgeLog.Info($"Skip complete file {file.relative_path}");
+                        BridgeLog.Info(
+                            $"Skip complete file {file.relative_path} " +
+                            $"(bytes={existing}, sha={HashUtil.ShortHash(actualHash)})");
                         return;
                     }
 
+                    BridgeLog.Warn(
+                        $"Cache stale for {file.relative_path}: size ok but hash mismatch " +
+                        $"(disk={HashUtil.ShortHash(actualHash)} expected={HashUtil.ShortHash(file.sha256)}); re-downloading.");
                     File.Delete(destPath);
                     existing = 0;
                 }
@@ -199,6 +205,9 @@ namespace Unslop.UnityBridge.Editor.Downloads
                 throw new InvalidOperationException(
                     $"Downloaded size mismatch for {file.relative_path}: expected {file.byte_length}, got {length}");
             }
+
+            BridgeLog.Info(
+                $"Downloaded {file.relative_path} bytes={length} sha={HashUtil.ShortHash(HashUtil.Sha256File(destPath))}");
         }
 
         public static AssetVersionManifest ToManifest(AssetVersionDetailDto detail)

@@ -126,6 +126,12 @@ namespace Unslop.UnityBridge.Editor.Scale
 
             var measured = _measurement.MeasureRendererBounds(wrapperInstance);
             var tolerance = _measurement.DefaultToleranceMetres;
+            BridgeLog.Info(
+                $"Scale confirm asset={reference.AssetId} version={versionId} spec={physicalSpecId} " +
+                $"size_m=({measured.SizeMetres.x:F3},{measured.SizeMetres.y:F3},{measured.SizeMetres.z:F3}) " +
+                $"tolerance=({tolerance.x:F3},{tolerance.y:F3},{tolerance.z:F3}) " +
+                $"rootScale={wrapperInstance.transform.lossyScale}");
+            MeshImportDiagnostics.LogGameObjectMeshBounds("Scale confirm hierarchy", wrapperInstance);
             var client = BridgeServices.CreateClientContext();
             var request = new ScaleConfirmationCreateDto
             {

@@ -247,6 +247,10 @@ namespace Unslop.UnityBridge.Editor.Transactions
                 var modelFileName = Path.GetFileName(session.CandidateModelPath);
                 var installedModelPath = $"{installedRoot}/{modelFileName}";
                 CopyAssetPreservingMeta(session.CandidateModelPath, installedModelPath);
+                AssetDatabase.ImportAsset(
+                    installedModelPath,
+                    ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+                MeshImportDiagnostics.LogAssetMeshBounds("Accept: installed model", installedModelPath);
 
                 var texturesSource = session.StagingAssetPath + "/textures";
                 var texturesDest = installedRoot + "/Textures";

@@ -81,7 +81,23 @@ namespace Unslop.UnityBridge.Editor.Install
             ManagedPaths.EnsureDirectory(installedRoot);
             var modelFileName = Path.GetFileName(staging.ModelAssetPath);
             var installedModelPath = $"{installedRoot}/{modelFileName}";
+            var modelManifestFile = download.Manifest?.files?.FirstOrDefault(f =>
+                string.Equals(
+                    Path.GetFileName(f.relative_path),
+                    modelFileName,
+                    StringComparison.OrdinalIgnoreCase));
+            var expectedModelSha = modelManifestFile?.sha256 ?? download.ManifestSha256;
+
+            MeshImportDiagnostics.LogFile(
+                "Model download cache",
+                Path.Combine(download.DownloadRoot, (download.Manifest?.model?.relative_path ?? "model.fbx").Replace('/', Path.DirectorySeparatorChar)),
+                expectedModelSha);
+            MeshImportDiagnostics.LogFile("Model staging", ToFull(staging.ModelAssetPath), expectedModelSha);
+
             CopyAssetPreservingMeta(staging.ModelAssetPath, installedModelPath);
+            ForceReimportModel(installedModelPath);
+            MeshImportDiagnostics.LogFile("Model installed", ToFull(installedModelPath), expectedModelSha);
+            MeshImportDiagnostics.LogAssetMeshBounds("Model installed (Unity import)", installedModelPath);
 
             // Copy textures referenced by materials into Installed/Textures for stable project paths.
             var texturesSource = staging.StagingAssetPath + "/textures";
@@ -98,12 +114,16 @@ namespace Unslop.UnityBridge.Editor.Install
             var modelPathForPrefab = File.Exists(ToFull(installedModelPath)) ? installedModelPath : staging.ModelAssetPath;
             var physicalSpecId = await SafePhysicalSpecId(assetId, cancellationToken);
             var displayName = download.Manifest?.display_name;
+            BridgeLog.Info(
+                $"Install version={versionId} modelPath={modelPathForPrefab} physical_spec={physicalSpecId ?? "(none)"} display={displayName}");
             var wrapper = WrapperPrefabBuilder.Build(
                 assetId,
                 versionId,
                 physicalSpecId,
                 modelPathForPrefab,
                 displayName);
+            MeshImportDiagnostics.LogAssetMeshBounds("Visual prefab after build", wrapper.VisualPrefabPath);
+            MeshImportDiagnostics.LogAssetMeshBounds("Asset prefab after build", wrapper.AssetPrefabPath);
 
             status?.Report("Assigning materials to Visual…");
             MaterialSlotApplicator.ApplyToPrefab(
@@ -208,6 +228,7 @@ namespace Unslop.UnityBridge.Editor.Install
             var dst = ToFull(destAssetPath);
             if (!File.Exists(src))
             {
+                BridgeLog.Warn($"Copy skipped — source missing: {sourceAssetPath}");
                 return;
             }
 
@@ -215,15 +236,27 @@ namespace Unslop.UnityBridge.Editor.Install
             var destMeta = dst + ".meta";
             var existingMeta = File.Exists(destMeta) ? File.ReadAllText(destMeta) : null;
             File.Copy(src, dst, true);
-            var srcMeta = src + ".meta";
             if (existingMeta != null)
             {
                 File.WriteAllText(destMeta, existingMeta);
             }
-            else if (File.Exists(srcMeta) && !File.Exists(destMeta))
+
+            BridgeLog.Info(
+                $"Copied asset {sourceAssetPath} → {destAssetPath} " +
+                $"(preservedMeta={existingMeta != null}, sha={HashUtil.ShortHash(HashUtil.Sha256File(dst))})");
+        }
+
+        static void ForceReimportModel(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath) || !File.Exists(ToFull(assetPath)))
             {
-                // New install: let Unity create a fresh GUID for Installed copy.
+                return;
             }
+
+            AssetDatabase.ImportAsset(
+                assetPath,
+                ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+            BridgeLog.Info($"Force-reimported model {assetPath}");
         }
 
         static void CopyFolderContents(string sourceAssetFolder, string destAssetFolder)

@@ -6,6 +6,7 @@ using Unslop.UnityBridge.Editor.Api;
 using Unslop.UnityBridge.Editor.Bootstrap;
 using Unslop.UnityBridge.Editor.Diagnostics;
 using Unslop.UnityBridge.Editor.FeatureFlags;
+using Unslop.UnityBridge.Editor.Importing;
 using Unslop.UnityBridge.Editor.Locking;
 using Unslop.UnityBridge.Editor.Services;
 using Unslop.UnityBridge.Editor.Settings;
@@ -70,6 +71,12 @@ namespace Unslop.UnityBridge.Editor.Scale
 
             var visual = ScaleMeasurementService.FindVisualCorrection(wrapperInstance);
             var currentVisual = visual != null ? visual.localScale : Vector3.one;
+            BridgeLog.Info(
+                $"Scale measure asset={reference.AssetId} version={reference.InstalledVersionId} " +
+                $"renderers={measured.RendererCount} size_m=({measured.SizeMetres.x:F3},{measured.SizeMetres.y:F3},{measured.SizeMetres.z:F3}) " +
+                $"center=({measured.Centre.x:F3},{measured.Centre.y:F3},{measured.Centre.z:F3}) " +
+                $"rootScale={wrapperInstance.transform.lossyScale} visualCorrection={currentVisual}");
+            MeshImportDiagnostics.LogGameObjectMeshBounds("Scale measure hierarchy", wrapperInstance);
             var localMeta = LockFileService.LoadLocalMetadata(reference.AssetId);
             var previousCorrection = localMeta?.visual_correction != null && localMeta.visual_correction.Length == 3
                 ? new Vector3(localMeta.visual_correction[0], localMeta.visual_correction[1], localMeta.visual_correction[2])
