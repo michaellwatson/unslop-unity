@@ -133,6 +133,16 @@ namespace Unslop.UnityBridge.Editor.Install
 
             SceneInstancePosePreserver.Restore(assetId, poses);
 
+            var pipeline = FirstNonEmpty(
+                detail.pipeline_origin,
+                detail.compatibility?.pipeline_origin);
+            BridgeLog.Info($"Install pipeline_origin={pipeline ?? "(none)"}");
+            if (VisualCorrectionReset.IsCanonicalScaleBake(pipeline))
+            {
+                status?.Report("canonical_scale_bake: resetting VisualCorrection to 1,1,1…");
+                VisualCorrectionReset.ApplyForCanonicalBake(assetId, wrapper.AssetPrefabPath);
+            }
+
             var lockEntry = new LockAssetEntry
             {
                 installed_version_id = versionId,
@@ -257,6 +267,19 @@ namespace Unslop.UnityBridge.Editor.Install
                 assetPath,
                 ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
             BridgeLog.Info($"Force-reimported model {assetPath}");
+        }
+
+        static string FirstNonEmpty(params string[] values)
+        {
+            foreach (var value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value.Trim();
+                }
+            }
+
+            return null;
         }
 
         static void CopyFolderContents(string sourceAssetFolder, string destAssetFolder)

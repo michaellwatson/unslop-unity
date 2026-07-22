@@ -303,7 +303,8 @@ namespace Unslop.UnityBridge.Editor.Downloads
                 classification = dto.classification ?? "compatible",
                 declared_changes = dto.declared_changes ?? new List<string>(),
                 hierarchy_compatible = dto.hierarchy_compatible,
-                material_slots_compatible = dto.material_slots_compatible
+                material_slots_compatible = dto.material_slots_compatible,
+                pipeline_origin = dto.pipeline_origin
             };
         }
 

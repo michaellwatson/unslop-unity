@@ -37,6 +37,7 @@ namespace Unslop.UnityBridge.Editor.Manifests
         public List<string> declared_changes = new List<string>();
         public bool hierarchy_compatible = true;
         public bool material_slots_compatible = true;
+        public string pipeline_origin;
     }
 
     [Serializable]

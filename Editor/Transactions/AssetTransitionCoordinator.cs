@@ -49,6 +49,7 @@ namespace Unslop.UnityBridge.Editor.Transactions
         public AssetVersionManifest CandidateManifest { get; set; }
         public string ManifestSha256 { get; set; }
         public string ImportProfileHash { get; set; }
+        public string PipelineOrigin { get; set; }
         public LockAssetEntry PreviousEntry { get; set; }
     }
 
@@ -158,6 +159,9 @@ namespace Unslop.UnityBridge.Editor.Transactions
                 session.CandidateMaterials = download.Materials;
                 session.ManifestSha256 = download.ManifestSha256;
                 session.ImportProfileHash = staging.ImportProfileHash;
+                session.PipelineOrigin = FirstNonEmpty(
+                    detail.pipeline_origin,
+                    detail.compatibility?.pipeline_origin);
 
                 status?.Report("Analysing diff…");
                 var installedRoot = ManagedPaths.InstalledAssetDir(journal.asset_id);
@@ -281,6 +285,13 @@ namespace Unslop.UnityBridge.Editor.Transactions
 
                 SceneInstancePosePreserver.Restore(journal.asset_id, poses);
 
+                BridgeLog.Info($"Accept pipeline_origin={session.PipelineOrigin ?? "(none)"}");
+                if (VisualCorrectionReset.IsCanonicalScaleBake(session.PipelineOrigin))
+                {
+                    status?.Report("canonical_scale_bake: resetting VisualCorrection to 1,1,1…");
+                    VisualCorrectionReset.ApplyForCanonicalBake(journal.asset_id, wrapper.AssetPrefabPath);
+                }
+
                 var lockEntry = new LockAssetEntry
                 {
                     installed_version_id = journal.to_version_id,
@@ -300,7 +311,8 @@ namespace Unslop.UnityBridge.Editor.Transactions
                 LockFileService.UpsertAsset(lockFile, journal.asset_id, lockEntry);
 
                 var visualCorrection = new[] { 1f, 1f, 1f };
-                if (!string.IsNullOrEmpty(journal.local_metadata_json))
+                if (!VisualCorrectionReset.IsCanonicalScaleBake(session.PipelineOrigin)
+                    && !string.IsNullOrEmpty(journal.local_metadata_json))
                 {
                     try
                     {
@@ -615,6 +627,19 @@ namespace Unslop.UnityBridge.Editor.Transactions
                 Directory.CreateDirectory(Path.GetDirectoryName(target) ?? dst);
                 File.Copy(file, target, true);
             }
+        }
+
+        static string FirstNonEmpty(params string[] values)
+        {
+            foreach (var value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value.Trim();
+                }
+            }
+
+            return null;
         }
 
         static void CopyDirectory(string source, string dest)

@@ -45,3 +45,5 @@ UnslopAssetRoot          ← UnslopAssetReference (scene placement lives here)
 Renaming these nodes breaks update preservation and scale measurement.
 
 Version updates refresh the Visual nested content **in place**. Scene instances keep their root transform / parenting; you should not need to re-place the asset after install.
+
+When `pipeline_origin` is **`canonical_scale_bake`**, VisualCorrection is reset to `1,1,1` automatically (scale is in the mesh). Scene instances keep their floor contact point so they do not jump.
