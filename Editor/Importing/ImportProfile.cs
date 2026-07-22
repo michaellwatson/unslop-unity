@@ -17,7 +17,7 @@ namespace Unslop.UnityBridge.Editor.Importing
         public static string ComputeImportProfileHash()
         {
             var payload = BuildCanonicalPayload();
-            return HashUtil.PrefixSha256(HashUtil.Sha256HexUtf8(payload));
+            return HashUtil.Sha256Utf8(payload);
         }
 
         public static void ApplyModelImporter(ModelImporter importer)

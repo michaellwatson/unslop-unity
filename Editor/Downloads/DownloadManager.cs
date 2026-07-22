@@ -67,13 +67,8 @@ namespace Unslop.UnityBridge.Editor.Downloads
                 Guid.NewGuid().ToString("N"),
                 cancellationToken);
 
+            PackageContentGuard.ValidateGrantAgainstManifest(detail, grant);
             PackageContentGuard.ValidateGrantAgainstManifest(grant, manifest);
-            if (!string.IsNullOrEmpty(grant.manifest_sha256)
-                && !string.IsNullOrEmpty(detail.manifest_sha256)
-                && !HashUtil.EqualsSha256(grant.manifest_sha256, detail.manifest_sha256))
-            {
-                throw new PackageGuardViolationException("Download grant manifest_sha256 does not match version metadata.");
-            }
 
             ManagedPaths.EnsureOperationalDirectories();
             var root = ManagedPaths.DownloadVersionDir(versionId);
@@ -91,7 +86,7 @@ namespace Unslop.UnityBridge.Editor.Downloads
                         StringComparison.OrdinalIgnoreCase));
                 if (declared == null)
                 {
-                    throw new PackageGuardViolationException($"Grant path missing from manifest: {file.relative_path}");
+                    throw new InvalidOperationException($"Grant path missing from manifest: {file.relative_path}");
                 }
 
                 PackageContentGuard.EnsureAllowedRole(declared.role);
@@ -108,11 +103,17 @@ namespace Unslop.UnityBridge.Editor.Downloads
             PackageContentGuard.ValidateDownloadedPackage(root, manifest);
             BridgeLog.Info($"Downloaded {files.Count} file(s) for version {versionId} into Library/Unslop/Downloads.");
 
+            var manifestHash = grant.manifest_sha256 ?? detail.manifest_sha256 ?? string.Empty;
+            if (!string.IsNullOrEmpty(manifestHash) && !manifestHash.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+            {
+                manifestHash = "sha256:" + HashUtil.Normalize(manifestHash);
+            }
+
             return new DownloadResult
             {
                 VersionId = versionId,
                 DownloadRoot = root,
-                ManifestSha256 = HashUtil.PrefixSha256(grant.manifest_sha256 ?? detail.manifest_sha256),
+                ManifestSha256 = manifestHash,
                 Manifest = manifest,
                 Materials = materials,
                 Files = files.Select(f => f.relative_path).ToList()
@@ -127,7 +128,7 @@ namespace Unslop.UnityBridge.Editor.Downloads
                 existing = new FileInfo(destPath).Length;
                 if (existing == file.byte_length)
                 {
-                    if (HashUtil.EqualsSha256(file.sha256, HashUtil.Sha256PrefixedFile(destPath)))
+                    if (HashUtil.EqualsHash(file.sha256, HashUtil.Sha256File(destPath)))
                     {
                         BridgeLog.Info($"Skip complete file {file.relative_path}");
                         return;
@@ -195,7 +196,7 @@ namespace Unslop.UnityBridge.Editor.Downloads
             var length = new FileInfo(destPath).Length;
             if (length != file.byte_length)
             {
-                throw new PackageGuardViolationException(
+                throw new InvalidOperationException(
                     $"Downloaded size mismatch for {file.relative_path}: expected {file.byte_length}, got {length}");
             }
         }

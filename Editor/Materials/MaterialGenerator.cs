@@ -107,7 +107,7 @@ namespace Unslop.UnityBridge.Editor.Materials
                 ? string.Empty
                 : string.Join("|", definition.textures.OrderBy(kv => kv.Key).Select(kv => kv.Key + "=" + kv.Value));
             var payload = $"{definition?.material_id}|{definition?.model}|{tex}|{materialPath}";
-            return HashUtil.PrefixSha256(HashUtil.Sha256HexUtf8(payload));
+            return HashUtil.Sha256Utf8(payload);
         }
 
         Dictionary<string, Texture2D> LoadTextures(MaterialDefinition definition, string stagingAssetPath)
