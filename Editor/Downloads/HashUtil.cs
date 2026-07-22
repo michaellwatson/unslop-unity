@@ -12,37 +12,38 @@ namespace Unslop.UnityBridge.Editor.Downloads
             using var stream = File.OpenRead(path);
             using var sha = SHA256.Create();
             var hash = sha.ComputeHash(stream);
-            var hex = BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
+            var hex = ToHex(hash);
             return prefixed ? "sha256:" + hex : hex;
         }
+
+        /// <summary>Raw hex SHA-256 of a file (no prefix).</summary>
+        public static string Sha256HexFile(string path) => Sha256File(path, prefixed: false);
+
+        /// <summary>Prefixed sha256:hex digest of a file.</summary>
+        public static string Sha256PrefixedFile(string path) => Sha256File(path, prefixed: true);
 
         public static string Sha256Bytes(byte[] data, bool prefixed = true)
         {
             using var sha = SHA256.Create();
             var hash = sha.ComputeHash(data ?? Array.Empty<byte>());
-            var hex = BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
+            var hex = ToHex(hash);
             return prefixed ? "sha256:" + hex : hex;
         }
 
         public static string Sha256Utf8(string text, bool prefixed = true)
             => Sha256Bytes(Encoding.UTF8.GetBytes(text ?? string.Empty), prefixed);
 
+        public static string Prefix(string hexOrPrefixed)
+        {
+            var hex = Normalize(hexOrPrefixed);
+            return string.IsNullOrEmpty(hex) ? string.Empty : "sha256:" + hex;
+        }
+
         /// <summary>Unprefixed hex digest of UTF-8 text.</summary>
         public static string Sha256HexUtf8(string text) => Sha256Utf8(text, prefixed: false);
 
         /// <summary>Ensure a hash string is in <c>sha256:hex</c> form.</summary>
-        public static string PrefixSha256(string hashOrHex)
-        {
-            if (string.IsNullOrWhiteSpace(hashOrHex))
-            {
-                return string.Empty;
-            }
-
-            var hex = Normalize(hashOrHex);
-            return string.IsNullOrEmpty(hex) ? string.Empty : "sha256:" + hex;
-        }
-
-        public static string Sha256PrefixedFile(string path) => Sha256File(path, prefixed: true);
+        public static string PrefixSha256(string hashOrHex) => Prefix(hashOrHex);
 
         public static bool EqualsHash(string expected, string actual)
         {
@@ -64,7 +65,10 @@ namespace Unslop.UnityBridge.Editor.Downloads
                 hash = hash.Substring("sha256:".Length);
             }
 
-            return hash.ToLowerInvariant();
+            return hash.Replace("-", string.Empty).ToLowerInvariant();
         }
+
+        static string ToHex(byte[] hash) =>
+            BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
     }
 }
