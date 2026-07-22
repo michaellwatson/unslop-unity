@@ -29,7 +29,7 @@ namespace Unslop.UnityBridge.Editor.Locking
                     schema_version = 1,
                     project_id = projectId ?? string.Empty,
                     environment = environment ?? "production",
-                    generated_by = $"{PackageInfo.PackageId}@{PackageInfo.Version}"
+                    generated_by = $"{BridgePackageInfo.PackageId}@{BridgePackageInfo.Version}"
                 };
                 Save(created);
                 return created;
@@ -49,7 +49,7 @@ namespace Unslop.UnityBridge.Editor.Locking
                 throw new ArgumentNullException(nameof(lockFile));
             }
 
-            lockFile.generated_by = $"{PackageInfo.PackageId}@{PackageInfo.Version}";
+            lockFile.generated_by = $"{BridgePackageInfo.PackageId}@{BridgePackageInfo.Version}";
             var json = CanonicalSerialize(lockFile);
             var temp = ManagedPaths.LockFilePath + ".tmp";
             File.WriteAllText(temp, json, new UTF8Encoding(false));

@@ -1,6 +1,9 @@
 namespace Unslop.UnityBridge.Editor.Bootstrap
 {
-    public static class PackageInfo
+    /// <summary>
+    /// Bridge package constants. Named BridgePackageInfo to avoid clashing with UnityEditor.PackageInfo.
+    /// </summary>
+    public static class BridgePackageInfo
     {
         public const string PackageId = "com.unslop.unity-bridge";
         public const string Version = "1.0.0";

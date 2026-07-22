@@ -81,7 +81,7 @@ namespace Unslop.UnityBridge.Editor.Scale
                 measured_dimensions_metres = measured.ToArray(),
                 tolerance_metres = new[] { tolerance.x, tolerance.y, tolerance.z },
                 unity_version = Application.unityVersion,
-                bridge_version = PackageInfo.Version,
+                bridge_version = BridgePackageInfo.Version,
                 render_pipeline = BridgeServices.CreateClientContext().render_pipeline,
                 import_profile_hash = entry?.import_profile_hash ?? ImportProfile.ComputeImportProfileHash(),
                 project_id = settings.BoundProjectId

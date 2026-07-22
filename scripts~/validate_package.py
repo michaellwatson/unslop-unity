@@ -64,7 +64,7 @@ def main() -> int:
     require(ROOT / "Runtime" / "UnslopAssetReference.cs")
     require(ROOT / "Runtime" / "UnslopSocket.cs")
     require(ROOT / "Editor" / "Bootstrap" / "UnslopBootstrap.cs")
-    require(ROOT / "Editor" / "Bootstrap" / "PackageInfo.cs")
+    require(ROOT / "Editor" / "Bootstrap" / "BridgePackageInfo.cs")
     require(ROOT / "Editor" / "Settings" / "UnslopProjectSettings.cs")
     require(ROOT / "Editor" / "Api" / "UnslopApiClient.cs")
     require(ROOT / "Editor" / "Api" / "IUnslopApiClient.cs")

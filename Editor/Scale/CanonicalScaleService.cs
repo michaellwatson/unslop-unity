@@ -100,7 +100,7 @@ namespace Unslop.UnityBridge.Editor.Scale
                     project_id = settings.BoundProjectId,
                     asset_version_id = reference.InstalledVersionId,
                     unity_version = Application.unityVersion,
-                    bridge_version = PackageInfo.Version
+                    bridge_version = BridgePackageInfo.Version
                 },
                 measurement = new PhysicalSpecMeasurementDto
                 {

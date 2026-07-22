@@ -10,7 +10,7 @@ namespace Unslop.UnityBridge.Editor.Settings
     {
         public const string AssetPath = "Assets/Unslop/Settings/UnslopProjectSettings.asset";
 
-        [SerializeField] string apiBaseUrl = PackageInfo.DefaultApiBaseUrl;
+        [SerializeField] string apiBaseUrl = BridgePackageInfo.DefaultApiBaseUrl;
         [SerializeField] string boundProjectId = string.Empty;
         [SerializeField] string boundProjectName = string.Empty;
         [SerializeField] string environment = "production";
@@ -18,7 +18,7 @@ namespace Unslop.UnityBridge.Editor.Settings
 
         public string ApiBaseUrl
         {
-            get => string.IsNullOrWhiteSpace(apiBaseUrl) ? PackageInfo.DefaultApiBaseUrl : apiBaseUrl.TrimEnd('/');
+            get => string.IsNullOrWhiteSpace(apiBaseUrl) ? BridgePackageInfo.DefaultApiBaseUrl : apiBaseUrl.TrimEnd('/');
             set => apiBaseUrl = value;
         }
 

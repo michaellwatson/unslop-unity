@@ -20,7 +20,7 @@ namespace Unslop.UnityBridge.Editor.Services
         {
             var settings = Settings;
             var baseUrl = string.IsNullOrWhiteSpace(settings.ApiBaseUrl)
-                ? PackageInfo.DefaultApiBaseUrl
+                ? BridgePackageInfo.DefaultApiBaseUrl
                 : settings.ApiBaseUrl;
             return new UnslopApiClient(baseUrl, () => Credentials.LoadApiKey());
         }
@@ -34,7 +34,7 @@ namespace Unslop.UnityBridge.Editor.Services
             {
                 engine = "unity",
                 unity_version = UnityEngine.Application.unityVersion,
-                bridge_version = PackageInfo.Version,
+                bridge_version = BridgePackageInfo.Version,
                 render_pipeline = "urp",
                 manifest_schema_versions = new System.Collections.Generic.List<int> { 1 }
             };

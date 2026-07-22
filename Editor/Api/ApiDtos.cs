@@ -53,7 +53,7 @@ namespace Unslop.UnityBridge.Editor.Api
     }
 
     [Serializable]
-    public sealed class AssetVersionSummaryDto
+    public class AssetVersionSummaryDto
     {
         public string asset_version_id;
         public string asset_id;

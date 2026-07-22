@@ -24,7 +24,7 @@ namespace Unslop.UnityBridge.Editor.Diagnostics
                 Path.Combine(exportRoot, "readme.txt"),
                 "Unslop Unity Bridge diagnostic export (redacted).\n"
                 + "unity=" + Application.unityVersion + "\n"
-                + "bridge=" + PackageInfo.Version + "\n"
+                + "bridge=" + BridgePackageInfo.Version + "\n"
                 + "project=" + settings.BoundProjectId + "\n"
                 + "reason=" + (reason ?? string.Empty) + "\n",
                 Encoding.UTF8);

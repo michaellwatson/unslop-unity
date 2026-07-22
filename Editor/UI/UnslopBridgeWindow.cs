@@ -39,11 +39,11 @@ namespace Unslop.UnityBridge.Editor.UI
         AssetVersionSummaryDto[] _versions = Array.Empty<AssetVersionSummaryDto>();
         bool _busy;
 
-        [MenuItem(PackageInfo.MenuRoot + "/Asset Bridge")]
+        [MenuItem(BridgePackageInfo.MenuRoot + "/Asset Bridge")]
         public static void Open()
         {
             var window = GetWindow<UnslopBridgeWindow>();
-            window.titleContent = new GUIContent(PackageInfo.WindowTitle);
+            window.titleContent = new GUIContent(BridgePackageInfo.WindowTitle);
             window.minSize = new Vector2(720, 480);
         }
 
@@ -106,7 +106,7 @@ namespace Unslop.UnityBridge.Editor.UI
 
             _apiBaseField = new TextField("API Base URL")
             {
-                value = BridgeServices.Settings.ApiBaseUrl ?? PackageInfo.DefaultApiBaseUrl
+                value = BridgeServices.Settings.ApiBaseUrl ?? BridgePackageInfo.DefaultApiBaseUrl
             };
             col.Add(_apiBaseField);
 
@@ -120,7 +120,7 @@ namespace Unslop.UnityBridge.Editor.UI
             row.Add(new Button(() => _ = LoadProjectsAsync()) { text = "Test Connection" });
             col.Add(row);
 
-            var help = new Label($"Default API: {PackageInfo.DefaultApiBaseUrl}");
+            var help = new Label($"Default API: {BridgePackageInfo.DefaultApiBaseUrl}");
             help.style.marginTop = 10;
             help.style.opacity = 0.75f;
             col.Add(help);
@@ -308,7 +308,7 @@ namespace Unslop.UnityBridge.Editor.UI
         {
             var settings = BridgeServices.Settings;
             var url = string.IsNullOrWhiteSpace(_apiBaseField?.value)
-                ? PackageInfo.DefaultApiBaseUrl
+                ? BridgePackageInfo.DefaultApiBaseUrl
                 : _apiBaseField.value.TrimEnd('/');
             settings.ApiBaseUrl = url;
             EditorUtility.SetDirty(settings);
