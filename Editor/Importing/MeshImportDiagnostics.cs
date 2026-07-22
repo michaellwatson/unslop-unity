@@ -125,7 +125,8 @@ namespace Unslop.UnityBridge.Editor.Importing
 
             BridgeLog.Info(
                 $"{label}: meshes={meshCount} renderers={renderers.Length} " +
-                $"meshLocalSize={Format(localSize)} worldAabbSize={Format(worldSize)}" +
+                $"meshLocalSize={Format(localSize)} worldAabbSize={Format(worldSize)} " +
+                $"rootLocalScale={Format(root.transform.localScale)} rootLossyScale={Format(root.transform.lossyScale)}" +
                 (string.IsNullOrEmpty(pathHint) ? string.Empty : $" path={pathHint}"));
         }
 

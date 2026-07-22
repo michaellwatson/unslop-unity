@@ -237,10 +237,15 @@ namespace Unslop.UnityBridge.Editor.Importing
 
             var nested = (GameObject)PrefabUtility.InstantiatePrefab(sourcePrefab);
             nested.name = instanceName;
+            // Keep the prefab's native localScale (FBX file-scale / unit conversion often lives here).
+            var nativeScale = nested.transform.localScale;
             nested.transform.SetParent(parent, false);
             nested.transform.localPosition = Vector3.zero;
             nested.transform.localRotation = Quaternion.identity;
-            nested.transform.localScale = Vector3.one;
+            nested.transform.localScale = nativeScale;
+            BridgeLog.Info(
+                $"Nested '{instanceName}' under '{parent.name}' preserving localScale={nativeScale} " +
+                $"(lossy={nested.transform.lossyScale})");
         }
 
         static Transform FindDirectChild(Transform parent, string childName)
