@@ -4,8 +4,6 @@
   "references": [
     "Unslop.UnityBridge.Editor",
     "Unslop.UnityBridge.Runtime",
-    "UnityEngine.TestRunner",
-    "UnityEditor.TestRunner",
     "Newtonsoft.Json"
   ],
   "includePlatforms": [
