@@ -1,0 +1,10 @@
+/.local/
+/.cursor/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
+*.csproj
+*.sln
+*.tmp
+*.log

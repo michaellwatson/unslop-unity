@@ -1,0 +1,21 @@
+{
+  "name": "Unslop.UnityBridge.Editor",
+  "rootNamespace": "Unslop.UnityBridge.Editor",
+  "references": [
+    "Unslop.UnityBridge.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Newtonsoft.Json"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

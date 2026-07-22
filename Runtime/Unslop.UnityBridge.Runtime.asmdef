@@ -1,0 +1,14 @@
+{
+  "name": "Unslop.UnityBridge.Runtime",
+  "rootNamespace": "Unslop.UnityBridge",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -1,0 +1,28 @@
+{
+  "name": "com.unslop.unity-bridge",
+  "version": "1.0.0",
+  "displayName": "Unslop Unity Asset Bridge",
+  "description": "Bidirectional FBX, material, scale and version synchronisation between Unslop and Unity Editor projects.",
+  "unity": "6000.0",
+  "documentationUrl": "https://unsloplabs.com/api/docs",
+  "changelogUrl": "https://github.com/unslop/unslop-unity/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/unslop/unslop-unity/blob/main/LICENSE.md",
+  "keywords": [
+    "unslop",
+    "assets",
+    "fbx",
+    "bridge",
+    "urp",
+    "versioning"
+  ],
+  "author": {
+    "name": "Unslop",
+    "url": "https://unsloplabs.com"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.0.0",
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  },
+  "samples": []
+}
