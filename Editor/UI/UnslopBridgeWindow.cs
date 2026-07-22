@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Unslop.UnityBridge;
 using Unslop.UnityBridge.Editor.Api;
 using Unslop.UnityBridge.Editor.Authentication;
 using Unslop.UnityBridge.Editor.Bootstrap;
+using Unslop.UnityBridge.Editor.Browser;
 using Unslop.UnityBridge.Editor.Diagnostics;
 using Unslop.UnityBridge.Editor.Install;
 using Unslop.UnityBridge.Editor.Locking;
+using Unslop.UnityBridge.Editor.Scale;
 using Unslop.UnityBridge.Editor.Services;
 using UnityEditor;
 using UnityEngine;
@@ -166,11 +169,14 @@ namespace Unslop.UnityBridge.Editor.UI
         {
             var tab = new Tab("Browse");
             var root = new VisualElement { style = { flexDirection = FlexDirection.Column, flexGrow = 1 } };
-            var buttons = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+            var buttons = new VisualElement { style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap } };
             buttons.Add(new Button(() => _ = LoadProjectsAsync()) { text = "Refresh Projects" });
             buttons.Add(new Button(() => _ = LoadAssetsAsync()) { text = "Refresh Assets" });
             buttons.Add(new Button(() => _ = LoadVersionsForSelectionAsync()) { text = "Refresh Versions" });
             buttons.Add(new Button(() => _ = InstallSelectedAsync()) { text = "Install Selected Version" });
+            buttons.Add(new Button(() => _ = CheckUpdatesAsync()) { text = "Check Updates" });
+            buttons.Add(new Button(() => _ = SetCanonicalScaleAsync()) { text = "Set Canonical Scale" });
+            buttons.Add(new Button(() => _ = ConfirmScaleAsync()) { text = "Confirm Scale" });
             root.Add(buttons);
 
             var split = new VisualElement { style = { flexDirection = FlexDirection.Row, flexGrow = 1, marginTop = 6 } };
@@ -204,11 +210,14 @@ namespace Unslop.UnityBridge.Editor.UI
             };
             _versionList.selectedIndicesChanged += _ => UpdateDetail();
             _detailLabel = new Label("Select an asset/version.") { style = { whiteSpace = WhiteSpace.Normal, marginTop = 8 } };
-            var installBtn = new Button(() => _ = InstallSelectedAsync()) { text = "Install Selected Version" };
-            installBtn.style.marginTop = 8;
+            var actionCol = new VisualElement { style = { flexDirection = FlexDirection.Column, marginTop = 8 } };
+            actionCol.Add(new Button(() => _ = InstallSelectedAsync()) { text = "Install Selected Version" });
+            actionCol.Add(new Button(() => _ = CheckUpdatesAsync()) { text = "Check Updates" });
+            actionCol.Add(new Button(() => _ = SetCanonicalScaleAsync()) { text = "Set Canonical Scale" });
+            actionCol.Add(new Button(() => _ = ConfirmScaleAsync()) { text = "Confirm Scale" });
             right.Add(_versionList);
             right.Add(_detailLabel);
-            right.Add(installBtn);
+            right.Add(actionCol);
 
             split.Add(_assetList);
             split.Add(right);
@@ -564,6 +573,152 @@ namespace Unslop.UnityBridge.Editor.UI
             {
                 EndBusy();
             }
+        }
+
+        async Task CheckUpdatesAsync()
+        {
+            if (!BeginBusy("Checking updates…"))
+            {
+                return;
+            }
+
+            try
+            {
+                RefreshApi();
+                var progress = new Progress<string>(SetMessage);
+                var result = await new UpdateCheckService(_api).CheckInstalledAsync(progress);
+                await ContinueOnMainThread(() =>
+                {
+                    var updates = result.Candidates.Where(c => c.HasUpdate).ToList();
+                    if (updates.Count == 0)
+                    {
+                        SetMessage($"Update check OK — no updates ({result.Candidates.Count} asset(s)).");
+                    }
+                    else
+                    {
+                        var summary = string.Join("\n", updates.Select(u =>
+                            $"{u.AssetId}: {u.InstalledVersionId} → {u.RecommendedVersionId} ({u.UpdateStatus})"));
+                        SetMessage($"{updates.Count} update(s) available.\n{summary}");
+                        EditorUtility.DisplayDialog("Unslop Updates", summary, "OK");
+                    }
+
+                    RefreshStatus();
+                });
+            }
+            catch (Exception ex)
+            {
+                BridgeLog.Exception(ex, "Check updates");
+                await ContinueOnMainThread(() => SetMessage(BridgeLog.Redact(ex.Message)));
+            }
+            finally
+            {
+                EndBusy();
+            }
+        }
+
+        async Task SetCanonicalScaleAsync()
+        {
+            var wrapper = ResolveSelectedWrapper();
+            if (wrapper == null)
+            {
+                SetMessage("Select an Unslop wrapper GameObject (with UnslopAssetReference) in the scene or Project.");
+                return;
+            }
+
+            if (!BeginBusy("Setting canonical scale…"))
+            {
+                return;
+            }
+
+            try
+            {
+                RefreshApi();
+                var result = await new CanonicalScaleService(_api).SetCurrentSizeAsCanonicalAsync(wrapper);
+                await ContinueOnMainThread(() =>
+                {
+                    SetMessage(result.Message);
+                    if (result.Conflict412)
+                    {
+                        EditorUtility.DisplayDialog("Unslop", result.Message, "OK");
+                    }
+                    else
+                    {
+                        EditorUtility.DisplayDialog(
+                            "Unslop",
+                            $"{result.Message}\nMeasured: {result.MeasuredMetres}",
+                            "OK");
+                    }
+
+                    RefreshInstalled();
+                });
+            }
+            catch (Exception ex)
+            {
+                BridgeLog.Exception(ex, "Set canonical scale");
+                await ContinueOnMainThread(() => SetMessage(BridgeLog.Redact(ex.Message)));
+            }
+            finally
+            {
+                EndBusy();
+            }
+        }
+
+        async Task ConfirmScaleAsync()
+        {
+            var wrapper = ResolveSelectedWrapper();
+            if (wrapper == null)
+            {
+                SetMessage("Select an Unslop wrapper GameObject (with UnslopAssetReference) in the scene or Project.");
+                return;
+            }
+
+            if (!BeginBusy("Confirming scale…"))
+            {
+                return;
+            }
+
+            try
+            {
+                RefreshApi();
+                var result = await new ScaleConfirmationService(_api).ConfirmAsync(wrapper);
+                await ContinueOnMainThread(() =>
+                {
+                    SetMessage($"{result.BadgeLabel} — {result.Message}");
+                    EditorUtility.DisplayDialog("Unslop", $"{result.BadgeLabel}\n{result.Message}", "OK");
+                });
+            }
+            catch (Exception ex)
+            {
+                BridgeLog.Exception(ex, "Confirm scale");
+                await ContinueOnMainThread(() => SetMessage(BridgeLog.Redact(ex.Message)));
+            }
+            finally
+            {
+                EndBusy();
+            }
+        }
+
+        static GameObject ResolveSelectedWrapper()
+        {
+            var go = Selection.activeGameObject;
+            if (go != null
+                && (go.GetComponent<UnslopAssetReference>() != null
+                    || go.GetComponentInChildren<UnslopAssetReference>() != null
+                    || go.GetComponentInParent<UnslopAssetReference>() != null))
+            {
+                var reference = go.GetComponent<UnslopAssetReference>()
+                                ?? go.GetComponentInParent<UnslopAssetReference>()
+                                ?? go.GetComponentInChildren<UnslopAssetReference>();
+                return reference != null ? reference.gameObject : go;
+            }
+
+            if (Selection.activeObject is GameObject prefab
+                && prefab.GetComponent<UnslopAssetReference>() != null)
+            {
+                return prefab;
+            }
+
+            return null;
         }
 
         void SetMessage(string message)
