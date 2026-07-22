@@ -70,16 +70,55 @@ namespace Unslop.UnityBridge.Editor.Install
             status?.Report("Materialising staging…");
             var staging = StagingMaterialiser.Materialise(download.DownloadRoot, download.Manifest, assetId, versionId);
 
+            // Settle the friendly installed folder BEFORE writing materials/textures/prefabs
+            // so AssetDatabase paths stay valid (rename-after-write left .mat paths stale).
+            var displayName = download.Manifest?.display_name;
+            status?.Report("Preparing installed folder…");
+            var installedRoot = ManagedPaths.EnsureFriendlyInstalledDir(assetId, displayName);
+            ManagedPaths.EnsureDirectory(installedRoot);
+            ManagedPaths.EnsureDirectory(installedRoot + "/Materials");
+            ManagedPaths.EnsureDirectory(installedRoot + "/textures");
+            ManagedPaths.EnsureDirectory(installedRoot + "/Prefabs");
+
+            // Copy textures first so material generation references Installed paths (not __Staging).
+            var texturesSource = staging.StagingAssetPath + "/textures";
+            var texturesDest = installedRoot + "/textures";
+            if (AssetDatabase.IsValidFolder(texturesSource) || Directory.Exists(ToFull(texturesSource)))
+            {
+                CopyFolderContents(texturesSource, texturesDest);
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                // Re-apply import profile on installed textures.
+                if (Directory.Exists(ToFull(texturesDest)))
+                {
+                    foreach (var file in Directory.GetFiles(ToFull(texturesDest), "*.*", SearchOption.AllDirectories))
+                    {
+                        if (file.EndsWith(".meta", StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        var assetPath = ToAssetPath(file);
+                        if (AssetImporter.GetAtPath(assetPath) is TextureImporter textureImporter)
+                        {
+                            ImportProfile.ApplyTextureImporter(textureImporter, Path.GetFileName(file));
+                            textureImporter.SaveAndReimport();
+                        }
+                    }
+                }
+            }
+
             status?.Report("Generating materials…");
-            var materialsDir = $"{ManagedPaths.InstalledAssetDir(assetId, download.Manifest?.display_name)}/Materials";
+            var materialsDir = $"{installedRoot}/Materials";
             var generator = new MaterialGenerator(MaterialGenerator.ResolveAdapter(BridgeServices.CreateClientContext().render_pipeline));
-            var materials = generator.Generate(download.Materials, staging.StagingAssetPath, materialsDir);
+            // Use installedRoot so materials.json texture paths (textures/...) resolve under Installed.
+            var materials = generator.Generate(download.Materials, installedRoot, materialsDir);
+            if (materials.ManagedCount == 0)
+            {
+                BridgeLog.Warn("No managed materials generated — check URP Lit shader and materials.json.");
+            }
 
             // Promote model into Installed before wrapper build so source GUID is under Installed when possible.
             status?.Report("Promoting model into Installed…");
-            var displayName = download.Manifest?.display_name;
-            var installedRoot = ManagedPaths.EnsureFriendlyInstalledDir(assetId, displayName);
-            ManagedPaths.EnsureDirectory(installedRoot);
             var modelFileName = Path.GetFileName(staging.ModelAssetPath);
             var installedModelPath = $"{installedRoot}/{modelFileName}";
             var modelManifestFile = download.Manifest?.files?.FirstOrDefault(f =>
@@ -100,14 +139,6 @@ namespace Unslop.UnityBridge.Editor.Install
             MeshImportDiagnostics.LogFile("Model installed", ToFull(installedModelPath), expectedModelSha);
             MeshImportDiagnostics.LogAssetMeshBounds("Model installed (Unity import)", installedModelPath);
 
-            // Copy textures referenced by materials into Installed/Textures for stable project paths.
-            var texturesSource = staging.StagingAssetPath + "/textures";
-            var texturesDest = installedRoot + "/Textures";
-            if (AssetDatabase.IsValidFolder(texturesSource) || Directory.Exists(ToFull(texturesSource)))
-            {
-                CopyFolderContents(texturesSource, texturesDest);
-            }
-
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
             status?.Report("Building wrapper prefabs…");
@@ -126,10 +157,16 @@ namespace Unslop.UnityBridge.Editor.Install
             MeshImportDiagnostics.LogAssetMeshBounds("Asset prefab after build", wrapper.AssetPrefabPath);
 
             status?.Report("Assigning materials to Visual…");
-            MaterialSlotApplicator.ApplyToPrefab(
+            var assigned = MaterialSlotApplicator.ApplyToPrefab(
                 wrapper.VisualPrefabPath,
                 download.Materials,
                 materials.MaterialPathsById);
+            if (assigned == 0 && materials.ManagedCount > 0)
+            {
+                BridgeLog.Warn(
+                    $"Materials were generated ({materials.ManagedCount}) but none were assigned to renderers. " +
+                    $"Visual={wrapper.VisualPrefabPath}");
+            }
 
             SceneInstancePosePreserver.Restore(assetId, poses);
             WrapperPrefabBuilder.RenameSceneInstances(assetId, displayName);
@@ -268,6 +305,19 @@ namespace Unslop.UnityBridge.Editor.Install
                 assetPath,
                 ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
             BridgeLog.Info($"Force-reimported model {assetPath}");
+        }
+
+        static string ToAssetPath(string fullPath)
+        {
+            var normalized = fullPath.Replace('\\', '/');
+            var root = ManagedPaths.ProjectRoot.Replace('\\', '/').TrimEnd('/');
+            if (normalized.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring(root.Length).TrimStart('/');
+            }
+
+            var assetsIdx = normalized.IndexOf("Assets/", StringComparison.OrdinalIgnoreCase);
+            return assetsIdx >= 0 ? normalized.Substring(assetsIdx) : normalized;
         }
 
         static string FirstNonEmpty(params string[] values)

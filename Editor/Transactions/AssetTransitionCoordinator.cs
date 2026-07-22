@@ -238,17 +238,29 @@ namespace Unslop.UnityBridge.Editor.Transactions
             try
             {
                 status?.Report("Regenerating materials and wrapper…");
-                var materialsDir = $"{ManagedPaths.InstalledAssetDir(journal.asset_id, session.CandidateManifest?.display_name)}/Materials";
+                var displayName = session.CandidateManifest?.display_name;
+                var installedRoot = ManagedPaths.EnsureFriendlyInstalledDir(journal.asset_id, displayName);
+                ManagedPaths.EnsureDirectory(installedRoot);
+                ManagedPaths.EnsureDirectory(installedRoot + "/Materials");
+                ManagedPaths.EnsureDirectory(installedRoot + "/textures");
+                ManagedPaths.EnsureDirectory(installedRoot + "/Prefabs");
+
+                var texturesSource = session.StagingAssetPath + "/textures";
+                var texturesDest = installedRoot + "/textures";
+                if (Directory.Exists(ToFull(texturesSource)))
+                {
+                    CopyFolderContents(texturesSource, texturesDest);
+                    AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                }
+
+                var materialsDir = $"{installedRoot}/Materials";
                 var generator = new MaterialGenerator(
                     MaterialGenerator.ResolveAdapter(BridgeServices.CreateClientContext().render_pipeline));
                 var materials = generator.Generate(
                     session.CandidateMaterials ?? new MaterialsManifest(),
-                    session.StagingAssetPath,
+                    installedRoot,
                     materialsDir);
 
-                var displayName = session.CandidateManifest?.display_name;
-                var installedRoot = ManagedPaths.EnsureFriendlyInstalledDir(journal.asset_id, displayName);
-                ManagedPaths.EnsureDirectory(installedRoot);
                 var modelFileName = Path.GetFileName(session.CandidateModelPath);
                 var installedModelPath = $"{installedRoot}/{modelFileName}";
                 CopyAssetPreservingMeta(session.CandidateModelPath, installedModelPath);
@@ -256,13 +268,6 @@ namespace Unslop.UnityBridge.Editor.Transactions
                     installedModelPath,
                     ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
                 MeshImportDiagnostics.LogAssetMeshBounds("Accept: installed model", installedModelPath);
-
-                var texturesSource = session.StagingAssetPath + "/textures";
-                var texturesDest = installedRoot + "/Textures";
-                if (Directory.Exists(ToFull(texturesSource)))
-                {
-                    CopyFolderContents(texturesSource, texturesDest);
-                }
 
                 AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
                 TransactionJournal.Advance(journal, TransactionPhases.Regenerated);
@@ -274,7 +279,7 @@ namespace Unslop.UnityBridge.Editor.Transactions
                     journal.to_version_id,
                     physicalSpecId,
                     File.Exists(ToFull(installedModelPath)) ? installedModelPath : session.CandidateModelPath,
-                    session.CandidateManifest?.display_name);
+                    displayName);
 
                 // GUID preservation check
                 if (!string.IsNullOrEmpty(journal.wrapper_prefab_guid)
@@ -283,6 +288,11 @@ namespace Unslop.UnityBridge.Editor.Transactions
                     BridgeLog.Warn(
                         $"Wrapper GUID changed during accept: {journal.wrapper_prefab_guid} → {wrapper.WrapperPrefabGuid}");
                 }
+
+                MaterialSlotApplicator.ApplyToPrefab(
+                    wrapper.VisualPrefabPath,
+                    session.CandidateMaterials,
+                    materials.MaterialPathsById);
 
                 SceneInstancePosePreserver.Restore(journal.asset_id, poses);
                 WrapperPrefabBuilder.RenameSceneInstances(journal.asset_id, displayName);

@@ -40,12 +40,20 @@ namespace Unslop.UnityBridge.Editor.Materials
                 {
                     loaded[kv.Key] = mat;
                 }
+                else
+                {
+                    BridgeLog.Warn($"Managed material not found at '{kv.Value}' (id={kv.Key})");
+                }
             }
 
             if (loaded.Count == 0)
             {
+                BridgeLog.Warn(
+                    $"Material assignment skipped — 0/{materialPathsById.Count} materials loaded for {visualPrefabPath}");
                 return 0;
             }
+
+            BridgeLog.Info($"Applying {loaded.Count} managed material(s) to {visualPrefabPath}");
 
             var slots = materials?.slots ?? new List<MaterialSlot>();
             var contents = PrefabUtility.LoadPrefabContents(visualPrefabPath);
@@ -53,6 +61,11 @@ namespace Unslop.UnityBridge.Editor.Materials
             try
             {
                 var renderers = contents.GetComponentsInChildren<Renderer>(true);
+                if (renderers.Length == 0)
+                {
+                    BridgeLog.Warn("Material assignment: no renderers under " + visualPrefabPath);
+                }
+
                 foreach (var renderer in renderers)
                 {
                     assigned += AssignRenderer(renderer, loaded, slots);
@@ -120,9 +133,10 @@ namespace Unslop.UnityBridge.Editor.Materials
             if (shared == null || shared.Length == 0)
             {
                 // FBX with no materials — still apply a single default if we have one.
-                if (loaded.Count == 1)
+                if (loaded.Count >= 1)
                 {
                     renderer.sharedMaterial = loaded.Values.First();
+                    EditorUtility.SetDirty(renderer);
                     return 1;
                 }
 
@@ -134,7 +148,13 @@ namespace Unslop.UnityBridge.Editor.Materials
             for (var i = 0; i < next.Length; i++)
             {
                 var material = ResolveMaterialForSlot(renderer, i, next[i], loaded, slots);
-                if (material != null && next[i] != material)
+                if (material == null)
+                {
+                    continue;
+                }
+
+                // Always assign — FBX placeholder materials often share names but are different assets.
+                if (next[i] != material)
                 {
                     next[i] = material;
                     changed++;
@@ -145,6 +165,16 @@ namespace Unslop.UnityBridge.Editor.Materials
             {
                 renderer.sharedMaterials = next;
                 EditorUtility.SetDirty(renderer);
+                BridgeLog.Info(
+                    $"Assigned material(s) on renderer '{renderer.name}' ({changed} slot(s))");
+            }
+            else if (loaded.Count == 1)
+            {
+                // Force single-material apply even if Unity considers refs "equal" after reimport quirks.
+                renderer.sharedMaterial = loaded.Values.First();
+                EditorUtility.SetDirty(renderer);
+                changed = 1;
+                BridgeLog.Info($"Force-assigned single managed material on renderer '{renderer.name}'");
             }
 
             return changed;
