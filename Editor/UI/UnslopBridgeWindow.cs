@@ -137,7 +137,7 @@ namespace Unslop.UnityBridge.Editor.UI
                     ((Label)el).text = $"{p.name}  ({p.role})  {p.project_id}";
                 }
             };
-            _projectList.selectedIndicesChanged += _ =>
+            _projectList.selectedIndicesChanged += selection =>
             {
                 var idx = _projectList.selectedIndex;
                 if (idx < 0 || idx >= _projects.Length)
@@ -192,7 +192,7 @@ namespace Unslop.UnityBridge.Editor.UI
                     ((Label)el).text = $"{a.display_name}\n{a.lifecycle} | api={a.api_available} | rec={rec}";
                 }
             };
-            _assetList.selectedIndicesChanged += _ => _ = LoadVersionsForSelectionAsync();
+            _assetList.selectedIndicesChanged += selection => _ = LoadVersionsForSelectionAsync();
             _assetList.style.width = Length.Percent(50);
             _assetList.style.flexGrow = 1;
 

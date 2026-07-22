@@ -40,7 +40,7 @@ namespace Unslop.UnityBridge.Editor.Diagnostics
             var drift = DriftDiagnostics.Scan();
             var driftText = string.Join(
                 "\n",
-                drift.Select(f => $"{f.AssetId}|{f.Code}|{BridgeLog.Redact(f.Message)}"));
+                drift.Findings.Select(f => $"{f.AssetId}|{f.Kind}|{BridgeLog.Redact(f.Detail)}"));
             File.WriteAllText(Path.Combine(exportRoot, "drift.txt"), driftText + "\n", Encoding.UTF8);
 
             if (Directory.Exists(ManagedPaths.TransactionsDir))

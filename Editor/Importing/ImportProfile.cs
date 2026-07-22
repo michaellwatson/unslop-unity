@@ -46,9 +46,9 @@ namespace Unslop.UnityBridge.Editor.Importing
             importer.addCollider = false;
             importer.keepQuads = false;
             importer.indexFormat = ModelImporterIndexFormat.Auto;
-            importer.normalImportMode = ModelImporterNormalMode.Import;
+            importer.importNormals = ModelImporterNormals.Import;
             importer.normalSmoothingSource = ModelImporterNormalSmoothingSource.PreferSmoothingGroups;
-            importer.tangentImportMode = ModelImporterTangents.CalculateMikk;
+            importer.importTangents = ModelImporterTangents.CalculateMikk;
         }
 
         public static void ApplyTextureImporter(TextureImporter importer, string relativePath)
