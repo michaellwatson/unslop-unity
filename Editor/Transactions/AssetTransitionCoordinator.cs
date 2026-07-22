@@ -238,7 +238,7 @@ namespace Unslop.UnityBridge.Editor.Transactions
             try
             {
                 status?.Report("Regenerating materials and wrapper…");
-                var materialsDir = $"{ManagedPaths.InstalledAssetDir(journal.asset_id)}/Materials";
+                var materialsDir = $"{ManagedPaths.InstalledAssetDir(journal.asset_id, session.CandidateManifest?.display_name)}/Materials";
                 var generator = new MaterialGenerator(
                     MaterialGenerator.ResolveAdapter(BridgeServices.CreateClientContext().render_pipeline));
                 var materials = generator.Generate(
@@ -246,7 +246,8 @@ namespace Unslop.UnityBridge.Editor.Transactions
                     session.StagingAssetPath,
                     materialsDir);
 
-                var installedRoot = ManagedPaths.InstalledAssetDir(journal.asset_id);
+                var displayName = session.CandidateManifest?.display_name;
+                var installedRoot = ManagedPaths.EnsureFriendlyInstalledDir(journal.asset_id, displayName);
                 ManagedPaths.EnsureDirectory(installedRoot);
                 var modelFileName = Path.GetFileName(session.CandidateModelPath);
                 var installedModelPath = $"{installedRoot}/{modelFileName}";
@@ -284,6 +285,7 @@ namespace Unslop.UnityBridge.Editor.Transactions
                 }
 
                 SceneInstancePosePreserver.Restore(journal.asset_id, poses);
+                WrapperPrefabBuilder.RenameSceneInstances(journal.asset_id, displayName);
 
                 BridgeLog.Info($"Accept pipeline_origin={session.PipelineOrigin ?? "(none)"}");
                 if (VisualCorrectionReset.IsCanonicalScaleBake(session.PipelineOrigin))

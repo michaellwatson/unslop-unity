@@ -48,7 +48,7 @@ https://github.com/unslop/unslop-unity.git#v1.0.0
 2. Paste your Bridge API key (stored under `Library/Unslop/Auth`, never in project assets or the lock file).
 3. Select and bind your Unslop project.
 4. Browse published assets and install a version into `Assets/Unslop/Installed/`.
-5. Place the generated `Asset.prefab` wrapper in a scene.
+5. Place the generated wrapper prefab (named after the asset display name) in a scene.
 
 Declared project state is written to `Unslop.lock.json` at the project root (safe to commit). Machine-local caches and journals live under `Library/Unslop/`.
 

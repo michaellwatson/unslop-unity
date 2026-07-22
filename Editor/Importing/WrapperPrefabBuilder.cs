@@ -49,13 +49,17 @@ namespace Unslop.UnityBridge.Editor.Importing
                 throw new ArgumentException("modelAssetPath is required.", nameof(modelAssetPath));
             }
 
-            var installedRoot = ManagedPaths.InstalledAssetDir(assetId);
+            var installedRoot = ManagedPaths.EnsureFriendlyInstalledDir(assetId, displayName);
             ManagedPaths.EnsureDirectory(installedRoot);
             ManagedPaths.EnsureDirectory(installedRoot + "/Materials");
             ManagedPaths.EnsureDirectory(installedRoot + "/Prefabs");
 
-            var visualPath = $"{installedRoot}/Prefabs/Visual.prefab";
-            var assetPath = $"{installedRoot}/Prefabs/Asset.prefab";
+            var visualPath = EnsureFriendlyPrefabPath(
+                ManagedPaths.ResolveVisualPrefabPath(installedRoot, displayName),
+                ManagedPaths.PreferredVisualPrefabPath(installedRoot, displayName));
+            var assetPath = EnsureFriendlyPrefabPath(
+                ManagedPaths.ResolveWrapperPrefabPath(installedRoot, displayName),
+                ManagedPaths.PreferredWrapperPrefabPath(installedRoot, displayName));
 
             var modelPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(modelAssetPath);
             if (modelPrefab == null)
@@ -70,7 +74,9 @@ namespace Unslop.UnityBridge.Editor.Importing
             var wrapperGuid = AssetDatabase.AssetPathToGUID(assetPath);
             var visualGuidFinal = AssetDatabase.AssetPathToGUID(visualPath);
             AssetDatabase.SaveAssets();
-            BridgeLog.Info($"Built wrapper prefabs for {assetId} (visual={visualGuidFinal}, wrapper={wrapperGuid}).");
+            BridgeLog.Info(
+                $"Built wrapper prefabs for {assetId} display='{displayName}' root={installedRoot} " +
+                $"wrapper={Path.GetFileName(assetPath)} visual={visualGuidFinal} guid={wrapperGuid}");
 
             return new WrapperPrefabResult
             {
@@ -81,6 +87,38 @@ namespace Unslop.UnityBridge.Editor.Importing
                 WrapperPrefabGuid = wrapperGuid,
                 SourceFbxGuid = sourceFbxGuid
             };
+        }
+
+        static string EnsureFriendlyPrefabPath(string currentPath, string preferredPath)
+        {
+            currentPath = (currentPath ?? string.Empty).Replace('\\', '/');
+            preferredPath = (preferredPath ?? string.Empty).Replace('\\', '/');
+            if (string.IsNullOrEmpty(preferredPath))
+            {
+                return currentPath;
+            }
+
+            if (string.Equals(currentPath, preferredPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return preferredPath;
+            }
+
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(currentPath) != null
+                && AssetDatabase.LoadAssetAtPath<GameObject>(preferredPath) == null)
+            {
+                ManagedPaths.EnsureDirectory(Path.GetDirectoryName(preferredPath)?.Replace('\\', '/'));
+                var moveError = AssetDatabase.MoveAsset(currentPath, preferredPath);
+                if (string.IsNullOrEmpty(moveError))
+                {
+                    BridgeLog.Info($"Renamed prefab {Path.GetFileName(currentPath)} → {Path.GetFileName(preferredPath)}");
+                    return preferredPath;
+                }
+
+                BridgeLog.Warn($"Could not rename prefab to friendly name: {moveError}");
+                return currentPath;
+            }
+
+            return AssetDatabase.LoadAssetAtPath<GameObject>(currentPath) != null ? currentPath : preferredPath;
         }
 
         static void BuildOrUpdateVisualPrefab(string visualPath, GameObject modelPrefab, string displayName)
@@ -128,7 +166,7 @@ namespace Unslop.UnityBridge.Editor.Importing
             var visualPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(visualPath);
             var desiredRootName = string.IsNullOrWhiteSpace(displayName)
                 ? RootName
-                : SanitizeHierarchyName(displayName);
+                : displayName.Trim();
 
             if (AssetDatabase.LoadAssetAtPath<GameObject>(assetPath) != null)
             {
@@ -209,6 +247,84 @@ namespace Unslop.UnityBridge.Editor.Importing
             }
         }
 
+        /// <summary>
+        /// Renames scene wrapper instances to the asset display name (keeps VisualCorrection / UserContent).
+        /// </summary>
+        public static int RenameSceneInstances(string assetId, string displayName)
+        {
+            if (string.IsNullOrWhiteSpace(assetId) || string.IsNullOrWhiteSpace(displayName))
+            {
+                return 0;
+            }
+
+            var desired = displayName.Trim();
+            var renamed = 0;
+            foreach (var reference in UnityEngine.Object.FindObjectsByType<UnslopAssetReference>(
+                         FindObjectsInactive.Include,
+                         FindObjectsSortMode.None))
+            {
+                if (reference == null
+                    || !string.Equals(reference.AssetId, assetId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var go = reference.gameObject;
+                if (string.Equals(go.name, desired, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                // Only auto-rename generic / previous wrapper names.
+                if (!IsGenericWrapperName(go.name, desired))
+                {
+                    continue;
+                }
+
+                Undo.RecordObject(go, "Unslop Rename Wrapper");
+                go.name = desired;
+                PrefabUtility.RecordPrefabInstancePropertyModifications(go);
+                EditorUtility.SetDirty(go);
+                if (!string.IsNullOrEmpty(go.scene.path))
+                {
+                    EditorSceneManager.MarkSceneDirty(go.scene);
+                }
+
+                renamed++;
+            }
+
+            if (renamed > 0)
+            {
+                BridgeLog.Info($"Renamed {renamed} scene wrapper(s) to '{desired}'.");
+            }
+
+            return renamed;
+        }
+
+        static bool IsGenericWrapperName(string current, string desired)
+        {
+            if (string.IsNullOrWhiteSpace(current))
+            {
+                return true;
+            }
+
+            if (string.Equals(current, RootName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(current, "Asset", StringComparison.OrdinalIgnoreCase)
+                || current.StartsWith("Asset (", StringComparison.OrdinalIgnoreCase)
+                || current.StartsWith(RootName + " (", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // Previously assigned display name (with Unity's " (1)" suffix).
+            if (current.StartsWith(desired, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
         static Transform EnsureChild(Transform parent, string childName)
         {
             var existing = FindDirectChild(parent, childName);
@@ -260,16 +376,6 @@ namespace Unslop.UnityBridge.Editor.Importing
             }
 
             return null;
-        }
-
-        static string SanitizeHierarchyName(string name)
-        {
-            foreach (var c in Path.GetInvalidFileNameChars())
-            {
-                name = name.Replace(c, '_');
-            }
-
-            return string.IsNullOrWhiteSpace(name) ? RootName : name.Trim();
         }
     }
 

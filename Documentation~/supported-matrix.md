@@ -8,7 +8,7 @@
 | Texture formats | png, jpg, jpeg, tga, tif/tiff, exr | Colour / normal / roughness roles |
 | Auth | Bridge API key `usk_…` | Stored in `Library/Unslop/Auth` only |
 | API | `https://unsloplabs.com/api/v1` | Correlation ID, Idempotency-Key, If-Match |
-| Install | Hash-verified download + staging + wrapper | GUID-stable `Visual.prefab` / `Asset.prefab` |
+| Install | Hash-verified download + staging + wrapper | GUID-stable friendly-named wrapper / visual prefabs |
 | Updates | Staged + explicit accept/discard | No silent install |
 | Materials | Managed + local_override resolutions | Feature flag `unity_bridge_material_resolution_v1` |
 | Scale | Canonical write + confirmation | Feature flags for write / confirm |

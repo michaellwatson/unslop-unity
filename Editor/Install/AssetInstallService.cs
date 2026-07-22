@@ -71,13 +71,14 @@ namespace Unslop.UnityBridge.Editor.Install
             var staging = StagingMaterialiser.Materialise(download.DownloadRoot, download.Manifest, assetId, versionId);
 
             status?.Report("Generating materials…");
-            var materialsDir = $"{ManagedPaths.InstalledAssetDir(assetId)}/Materials";
+            var materialsDir = $"{ManagedPaths.InstalledAssetDir(assetId, download.Manifest?.display_name)}/Materials";
             var generator = new MaterialGenerator(MaterialGenerator.ResolveAdapter(BridgeServices.CreateClientContext().render_pipeline));
             var materials = generator.Generate(download.Materials, staging.StagingAssetPath, materialsDir);
 
             // Promote model into Installed before wrapper build so source GUID is under Installed when possible.
             status?.Report("Promoting model into Installed…");
-            var installedRoot = ManagedPaths.InstalledAssetDir(assetId);
+            var displayName = download.Manifest?.display_name;
+            var installedRoot = ManagedPaths.EnsureFriendlyInstalledDir(assetId, displayName);
             ManagedPaths.EnsureDirectory(installedRoot);
             var modelFileName = Path.GetFileName(staging.ModelAssetPath);
             var installedModelPath = $"{installedRoot}/{modelFileName}";
@@ -113,7 +114,6 @@ namespace Unslop.UnityBridge.Editor.Install
             var poses = SceneInstancePosePreserver.Capture(assetId);
             var modelPathForPrefab = File.Exists(ToFull(installedModelPath)) ? installedModelPath : staging.ModelAssetPath;
             var physicalSpecId = await SafePhysicalSpecId(assetId, cancellationToken);
-            var displayName = download.Manifest?.display_name;
             BridgeLog.Info(
                 $"Install version={versionId} modelPath={modelPathForPrefab} physical_spec={physicalSpecId ?? "(none)"} display={displayName}");
             var wrapper = WrapperPrefabBuilder.Build(
@@ -132,6 +132,7 @@ namespace Unslop.UnityBridge.Editor.Install
                 materials.MaterialPathsById);
 
             SceneInstancePosePreserver.Restore(assetId, poses);
+            WrapperPrefabBuilder.RenameSceneInstances(assetId, displayName);
 
             var pipeline = FirstNonEmpty(
                 detail.pipeline_origin,

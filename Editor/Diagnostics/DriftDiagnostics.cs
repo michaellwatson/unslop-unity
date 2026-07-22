@@ -151,7 +151,7 @@ namespace Unslop.UnityBridge.Editor.Diagnostics
                 }
                 else
                 {
-                    var expected = $"{installed}/Prefabs/Asset.prefab";
+                    var expected = ManagedPaths.ResolveWrapperPrefabPath(installed);
                     if (!string.Equals(path.Replace('\\', '/'), expected, StringComparison.OrdinalIgnoreCase))
                     {
                         report.Findings.Add(new DriftFinding
@@ -238,8 +238,8 @@ namespace Unslop.UnityBridge.Editor.Diagnostics
                 return "No lock entry.";
             }
 
-            var wrapperPath = $"{ManagedPaths.InstalledAssetDir(assetId)}/Prefabs/Asset.prefab";
-            var visualPath = $"{ManagedPaths.InstalledAssetDir(assetId)}/Prefabs/Visual.prefab";
+            var wrapperPath = ManagedPaths.ResolveWrapperPrefabPath(ManagedPaths.InstalledAssetDir(assetId));
+            var visualPath = ManagedPaths.ResolveVisualPrefabPath(ManagedPaths.InstalledAssetDir(assetId));
             var wrapperGuid = AssetDatabase.AssetPathToGUID(wrapperPath);
             var visualGuid = AssetDatabase.AssetPathToGUID(visualPath);
             if (string.IsNullOrEmpty(wrapperGuid))

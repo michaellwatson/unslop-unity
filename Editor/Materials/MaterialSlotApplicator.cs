@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Unslop.UnityBridge.Editor.Diagnostics;
+using Unslop.UnityBridge.Editor.Locking;
 using Unslop.UnityBridge.Editor.Manifests;
 using UnityEditor;
 using UnityEngine;
@@ -63,8 +65,15 @@ namespace Unslop.UnityBridge.Editor.Materials
                 PrefabUtility.UnloadPrefabContents(contents);
             }
 
-            // Also stamp the wrapper's nested Visual instance if Asset.prefab already exists beside it.
-            var assetPrefabPath = visualPrefabPath.Replace("/Visual.prefab", "/Asset.prefab");
+            // Also stamp the wrapper's nested Visual instance if the Asset prefab already exists beside it.
+            var prefabsDir = Path.GetDirectoryName(visualPrefabPath)?.Replace('\\', '/');
+            var installedRoot = string.IsNullOrEmpty(prefabsDir)
+                ? null
+                : Path.GetDirectoryName(prefabsDir)?.Replace('\\', '/');
+            var assetPrefabPath = !string.IsNullOrEmpty(installedRoot)
+                ? ManagedPaths.ResolveWrapperPrefabPath(installedRoot)
+                : visualPrefabPath.Replace("/Visual.prefab", "/Asset.prefab")
+                    .Replace("_Visual.prefab", ".prefab");
             if (!string.Equals(assetPrefabPath, visualPrefabPath, StringComparison.Ordinal)
                 && AssetDatabase.LoadAssetAtPath<GameObject>(assetPrefabPath) != null)
             {

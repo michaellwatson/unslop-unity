@@ -17,8 +17,8 @@
 
 1. Open **Browse** → **Refresh Assets**, select an asset and a published version.
 2. Click **Install Selected Version**.
-3. The bridge downloads with hash verification, stages under `Assets/Unslop/__Staging`, generates URP materials, and builds a stable wrapper prefab under `Assets/Unslop/Installed/<assetId>/Prefabs/Asset.prefab`.
-4. Drag **`Asset.prefab`** (not the raw FBX) into your scene. Keep the `UnslopAssetReference` component — scale/update tools look for it.
+3. The bridge downloads with hash verification, stages under `Assets/Unslop/__Staging`, generates URP materials, and builds a stable wrapper prefab under `Assets/Unslop/Installed/<DisplayName>_<shortId>/Prefabs/<DisplayName>.prefab`.
+4. Drag the **wrapper prefab** (named after the asset, not the raw FBX) into your scene. Keep the `UnslopAssetReference` component — scale/update tools look for it.
 
 ## Check updates (staged acceptance)
 
@@ -40,7 +40,7 @@ Local overrides are never overwritten on update or rollback unless you choose Ac
 
 ## Scale
 
-1. Drag `Assets/Unslop/Installed/<assetId>/Prefabs/Asset.prefab` into the scene (or select that instance / prefab in the Hierarchy / Project).
+1. Drag the wrapper prefab from `Assets/Unslop/Installed/<DisplayName>_<shortId>/Prefabs/` into the scene (or select that instance / prefab in the Hierarchy / Project).
 2. With the wrapper selected, click **Set Canonical Scale** — measures renderer bounds and writes a physical-spec revision online (`If-Match` ETag; HTTP 412 means refresh and retry).
 3. Then click **Confirm Scale** — submits Unity measurement evidence and shows an online confirmation badge.
 

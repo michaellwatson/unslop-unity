@@ -42,7 +42,7 @@ UnslopAssetRoot          ← UnslopAssetReference (scene placement lives here)
 └── UserContent          ← put sockets / gameplay attachments here
 ```
 
-Renaming these nodes breaks update preservation and scale measurement.
+Renaming **VisualCorrection** / **UserContent** / **Model** nodes breaks update preservation and scale measurement. The wrapper root and Project folder/prefab names use the asset display name (with a short id suffix on folders).
 
 Version updates refresh the Visual nested content **in place**. Scene instances keep their root transform / parenting; you should not need to re-place the asset after install.
 
