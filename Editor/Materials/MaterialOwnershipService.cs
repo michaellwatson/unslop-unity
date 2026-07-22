@@ -7,6 +7,7 @@ using Unslop.UnityBridge.Editor.Downloads;
 using Unslop.UnityBridge.Editor.FeatureFlags;
 using Unslop.UnityBridge.Editor.Locking;
 using Unslop.UnityBridge.Editor.Manifests;
+using Unslop.UnityBridge.Editor.Services;
 using UnityEditor;
 using UnityEngine;
 
@@ -199,7 +200,7 @@ namespace Unslop.UnityBridge.Editor.Materials
                     break;
             }
 
-            var settings = Services.BridgeServices.Settings;
+            var settings = BridgeServices.Settings;
             var lockFile = LockFileService.LoadOrCreate(settings.BoundProjectId, settings.Environment);
             LockFileService.UpsertAsset(lockFile, assetId, entry);
         }

@@ -29,7 +29,7 @@ Artists publish FBX + textures + `materials.json` + manifests through Unslop (no
 ## Material review tips
 
 - Prefer **Textures only** when albedo/normal/roughness updated but your shader tweaks should remain.
-- Prefer **Keep local** for hero hero materials with project-specific lookdev.
+- Prefer **Keep local** for hero materials with project-specific lookdev.
 - Quarantined materials land under `Materials/_Quarantine` when remote slots disappear.
 
 ## Wrapper hierarchy (do not rename)

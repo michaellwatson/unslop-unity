@@ -137,11 +137,13 @@ namespace Unslop.UnityBridge.Editor.Preview
             {
                 foreach (var r in focus.GetComponentsInChildren<Renderer>(true))
                 {
-                    _utility.DrawMesh(
-                        GetSharedMesh(r),
-                        r.localToWorldMatrix,
-                        r.sharedMaterial,
-                        0);
+                    var mesh = GetSharedMesh(r);
+                    if (mesh == null || r.sharedMaterial == null)
+                    {
+                        continue;
+                    }
+
+                    _utility.DrawMesh(mesh, r.localToWorldMatrix, r.sharedMaterial, 0);
                 }
             }
 
