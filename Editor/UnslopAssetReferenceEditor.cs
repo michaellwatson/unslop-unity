@@ -31,7 +31,7 @@ namespace Unslop.UnityBridge.Editor
             DrawReadonly(
                 "Physical Spec",
                 string.IsNullOrEmpty(reference.PhysicalSpecId)
-                    ? "(none — use Set Canonical Scale)"
+                    ? "(none — Accept Current Scale or Set Canonical Scale)"
                     : ShortId(reference.PhysicalSpecId));
             DrawReadonly("Wrapper Prefab", ShortId(reference.WrapperPrefabGuid));
 
@@ -51,13 +51,18 @@ namespace Unslop.UnityBridge.Editor
 
             EditorGUILayout.Space(6);
             EditorGUILayout.HelpBox(
-                "Scale: optionally resize VisualCorrection to real-world size, then Set Canonical Scale. " +
-                "That writes the measured size online and resets VisualCorrection to 1,1,1. Confirm Scale afterwards.",
+                "Select this wrapper in the Hierarchy. If the size is already correct, Accept Current Scale. " +
+                "If you resized VisualCorrection to real-world size, use Set Canonical Scale. Then Confirm Scale.",
                 MessageType.Info);
 
             using (new EditorGUI.DisabledScope(EditorApplication.isPlayingOrWillChangePlaymode))
             {
-                if (GUILayout.Button("Set Canonical Scale", GUILayout.Height(28)))
+                if (GUILayout.Button("Accept Current Scale", GUILayout.Height(28)))
+                {
+                    _ = RunAcceptCurrentScale(reference.gameObject);
+                }
+
+                if (GUILayout.Button("Set Canonical Scale"))
                 {
                     _ = RunCanonicalScale(reference.gameObject);
                 }
@@ -77,6 +82,24 @@ namespace Unslop.UnityBridge.Editor
             else
             {
                 SessionState.SetBool("Unslop.ShowRawIds", false);
+            }
+        }
+
+        static async Task RunAcceptCurrentScale(GameObject wrapper)
+        {
+            if (!CanonicalScaleService.ConfirmAcceptCurrentScale(wrapper))
+            {
+                return;
+            }
+
+            try
+            {
+                var result = await new CanonicalScaleService().AcceptCurrentScaleAsync(wrapper);
+                EditorUtility.DisplayDialog("Unslop", result.Message, "OK");
+            }
+            catch (System.Exception ex)
+            {
+                EditorUtility.DisplayDialog("Unslop", ex.Message, "OK");
             }
         }
 
