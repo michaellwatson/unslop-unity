@@ -177,6 +177,7 @@ namespace Unslop.UnityBridge.Editor.UI
             buttons.Add(new Button(() => _ = LoadVersionsForSelectionAsync()) { text = "Refresh Versions" });
             buttons.Add(new Button(() => _ = InstallSelectedAsync()) { text = "Install Selected Version" });
             buttons.Add(new Button(() => _ = CheckUpdatesAsync()) { text = "Check Updates" });
+            buttons.Add(new Button(() => _ = AcceptCurrentScaleAsync()) { text = "Accept Current Scale" });
             buttons.Add(new Button(() => _ = SetCanonicalScaleAsync()) { text = "Set Canonical Scale" });
             buttons.Add(new Button(() => _ = ConfirmScaleAsync()) { text = "Confirm Scale" });
             root.Add(buttons);
@@ -215,6 +216,7 @@ namespace Unslop.UnityBridge.Editor.UI
             var actionCol = new VisualElement { style = { flexDirection = FlexDirection.Column, marginTop = 8 } };
             actionCol.Add(new Button(() => _ = InstallSelectedAsync()) { text = "Install Selected Version" });
             actionCol.Add(new Button(() => _ = CheckUpdatesAsync()) { text = "Check Updates" });
+            actionCol.Add(new Button(() => _ = AcceptCurrentScaleAsync()) { text = "Accept Current Scale" });
             actionCol.Add(new Button(() => _ = SetCanonicalScaleAsync()) { text = "Set Canonical Scale" });
             actionCol.Add(new Button(() => _ = ConfirmScaleAsync()) { text = "Confirm Scale" });
             right.Add(_versionList);
@@ -697,7 +699,17 @@ namespace Unslop.UnityBridge.Editor.UI
             }
         }
 
+        async Task AcceptCurrentScaleAsync()
+        {
+            await WriteCanonicalScaleAsync(acceptCurrent: true);
+        }
+
         async Task SetCanonicalScaleAsync()
+        {
+            await WriteCanonicalScaleAsync(acceptCurrent: false);
+        }
+
+        async Task WriteCanonicalScaleAsync(bool acceptCurrent)
         {
             var wrapper = ResolveSelectedWrapper();
             if (wrapper == null)
@@ -706,7 +718,12 @@ namespace Unslop.UnityBridge.Editor.UI
                 return;
             }
 
-            if (!BeginBusy("Setting canonical scale…"))
+            if (acceptCurrent && !CanonicalScaleService.ConfirmAcceptCurrentScale(wrapper))
+            {
+                return;
+            }
+
+            if (!BeginBusy(acceptCurrent ? "Accepting current scale…" : "Setting canonical scale…"))
             {
                 return;
             }
@@ -714,7 +731,10 @@ namespace Unslop.UnityBridge.Editor.UI
             try
             {
                 RefreshApi();
-                var result = await new CanonicalScaleService(_api).SetCurrentSizeAsCanonicalAsync(wrapper);
+                var service = new CanonicalScaleService(_api);
+                var result = acceptCurrent
+                    ? await service.AcceptCurrentScaleAsync(wrapper)
+                    : await service.SetCurrentSizeAsCanonicalAsync(wrapper);
                 await ContinueOnMainThread(() =>
                 {
                     SetMessage(result.Message);
@@ -735,7 +755,7 @@ namespace Unslop.UnityBridge.Editor.UI
             }
             catch (Exception ex)
             {
-                BridgeLog.Exception(ex, "Set canonical scale");
+                BridgeLog.Exception(ex, acceptCurrent ? "Accept current scale" : "Set canonical scale");
                 await ContinueOnMainThread(() => SetMessage(BridgeLog.Redact(ex.Message)));
             }
             finally
