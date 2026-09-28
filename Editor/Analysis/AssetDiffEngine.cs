@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Unslop.UnityBridge.Editor.Diagnostics;
 using Unslop.UnityBridge.Editor.Downloads;
+using Unslop.UnityBridge.Editor.Importing;
 using Unslop.UnityBridge.Editor.Locking;
 using Unslop.UnityBridge.Editor.Manifests;
 using UnityEditor;
@@ -74,6 +76,7 @@ namespace Unslop.UnityBridge.Editor.Analysis
             CompareMaterials(report, installedMaterials, candidateMaterials);
             CompareHierarchy(report, installedRoot, candidateRoot);
             CompareBoundsAndPivot(report, installedRoot, candidateRoot);
+            CompareTransformsForDebug(report, installedRoot, candidateRoot);
 
             if (candidateManifest?.compatibility?.declared_changes != null)
             {
@@ -335,6 +338,21 @@ namespace Unslop.UnityBridge.Editor.Analysis
                     Detail = $"{report.InstalledPivot} → {report.CandidatePivot}"
                 });
             }
+        }
+
+        static void CompareTransformsForDebug(AssetDiffReport report, GameObject installed, GameObject candidate)
+        {
+            if (!BridgeDebugMode.Enabled)
+            {
+                return;
+            }
+
+            var leftLabel = $"installed({report?.InstalledVersionId ?? "?"})";
+            var rightLabel = $"candidate({report?.CandidateVersionId ?? "?"})";
+            BridgeLog.Debug(
+                $"AssetDiff transform compare asset={report?.AssetId} {leftLabel} vs {rightLabel} " +
+                $"(Meshy/artist pipeline scale & rotation deltas)");
+            TransformDebugLog.CompareHierarchies(leftLabel, installed, rightLabel, candidate);
         }
 
         static HashSet<string> CollectHierarchy(GameObject root)

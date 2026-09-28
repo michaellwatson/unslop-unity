@@ -31,6 +31,7 @@ namespace Unslop.UnityBridge.Editor.Locking
         public static string TransactionsDir => Path.Combine(LibraryRoot, "Transactions");
         public static string LocksDir => Path.Combine(LibraryRoot, "Locks");
         public static string DiagnosticsDir => Path.Combine(LibraryRoot, "Diagnostics");
+        public static string PublishDir => Path.Combine(LibraryRoot, "Publish");
 
         /// <summary>
         /// Resolves the installed asset folder. Prefers an existing folder (GUID or friendly),
@@ -313,6 +314,7 @@ namespace Unslop.UnityBridge.Editor.Locking
             EnsureDirectory(TransactionsDir);
             EnsureDirectory(LocksDir);
             EnsureDirectory(DiagnosticsDir);
+            EnsureDirectory(PublishDir);
             EnsureDirectory(InstalledRoot);
             EnsureDirectory(StagingRoot);
             EnsureDirectory(SettingsRoot);

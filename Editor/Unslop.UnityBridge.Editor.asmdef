@@ -19,6 +19,11 @@
       "name": "com.unity.render-pipelines.universal",
       "expression": "14.0.0",
       "define": "UNSLOP_HAS_URP"
+    },
+    {
+      "name": "com.unity.formats.fbx",
+      "expression": "4.0.0",
+      "define": "UNSLOP_HAS_FBX_EXPORTER"
     }
   ],
   "noEngineReferences": false

@@ -59,11 +59,11 @@ namespace Unslop.UnityBridge.Editor.Importing
             }
 
             var isNormal = LooksLikeNormalMap(relativePath);
-            var isRoughness = LooksLikeRoughness(relativePath);
+            var isLinearData = LooksLikeLinearDataMap(relativePath);
             var isPreview = LooksLikePreview(relativePath);
 
             importer.textureType = isNormal ? TextureImporterType.NormalMap : TextureImporterType.Default;
-            importer.sRGBTexture = !isNormal && !isRoughness;
+            importer.sRGBTexture = !isNormal && !isLinearData;
             importer.alphaSource = TextureImporterAlphaSource.FromInput;
             importer.mipmapEnabled = !isPreview;
             importer.streamingMipmaps = false;
@@ -88,6 +88,16 @@ namespace Unslop.UnityBridge.Editor.Importing
             return name.Contains("rough") || name.Contains("roughness");
         }
 
+        public static bool LooksLikeLinearDataMap(string relativePath)
+        {
+            var name = (relativePath ?? string.Empty).ToLowerInvariant();
+            return LooksLikeRoughness(name)
+                   || name.Contains("metal")
+                   || name.Contains("occlusion")
+                   || name.Contains("_ao")
+                   || name.Contains("maskmap");
+        }
+
         public static bool LooksLikePreview(string relativePath)
         {
             var name = (relativePath ?? string.Empty).ToLowerInvariant();
@@ -108,6 +118,8 @@ namespace Unslop.UnityBridge.Editor.Importing
                 "model.meshCompression=Off",
                 "texture.normal.sRGB=false",
                 "texture.roughness.sRGB=false",
+                "texture.metallic.sRGB=false",
+                "texture.ao.sRGB=false",
                 "texture.color.sRGB=true",
                 "texture.mipmapEnabled=true",
                 "texture.maxTextureSize=4096",

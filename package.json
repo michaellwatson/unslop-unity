@@ -1,6 +1,6 @@
 {
   "name": "com.unslop.unity-bridge",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "displayName": "Unslop Unity Asset Bridge",
   "description": "Bidirectional FBX, material, scale and version synchronisation between Unslop and Unity Editor projects.",
   "unity": "6000.0",
@@ -13,6 +13,7 @@
     "fbx",
     "bridge",
     "urp",
+    "hdrp",
     "versioning"
   ],
   "author": {

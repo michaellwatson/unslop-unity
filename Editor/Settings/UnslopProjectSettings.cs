@@ -1,5 +1,6 @@
 using System.IO;
 using Unslop.UnityBridge.Editor.Bootstrap;
+using Unslop.UnityBridge.Editor.Diagnostics;
 using Unslop.UnityBridge.Editor.Locking;
 using UnityEditor;
 using UnityEngine;
@@ -85,8 +86,56 @@ namespace Unslop.UnityBridge.Editor.Settings
                     EditorGUILayout.PropertyField(so.FindProperty("environment"), new GUIContent("Environment"));
                     EditorGUILayout.PropertyField(so.FindProperty("deferredUpdateChecks"), new GUIContent("Deferred Update Checks"));
                     so.ApplyModifiedProperties();
+
+                    EditorGUILayout.Space(8);
+                    EditorGUILayout.LabelField("Diagnostics", EditorStyles.boldLabel);
+                    var debug = EditorGUILayout.Toggle(
+                        new GUIContent(
+                            "Debug logging",
+                            "Verbose Console + local log; uploads to bound project via Bridge diagnostics API"),
+                        BridgeDebugMode.Enabled);
+                    if (debug != BridgeDebugMode.Enabled)
+                    {
+                        BridgeDebugMode.Enabled = debug;
+                    }
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button("Reveal Debug Log", GUILayout.Width(140)))
+                        {
+                            BridgeDebugMode.RevealLog();
+                        }
+
+                        if (GUILayout.Button("Clear Debug Log", GUILayout.Width(140)))
+                        {
+                            BridgeDebugMode.ClearLog();
+                        }
+
+                        if (GUILayout.Button("Upload Debug Log", GUILayout.Width(140)))
+                        {
+                            BridgeDebugUploader.TryFlushFireAndForget(isFinal: true);
+                        }
+
+                        if (GUILayout.Button("Pull Latest", GUILayout.Width(100)))
+                        {
+                            _ = PullLatestFromSettings();
+                        }
+                    }
                 }
             };
+        }
+
+        static async System.Threading.Tasks.Task PullLatestFromSettings()
+        {
+            try
+            {
+                var path = await BridgeDebugUploader.PullLatestAsync();
+                EditorUtility.RevealInFinder(path);
+            }
+            catch (System.Exception ex)
+            {
+                BridgeLog.Warn("Pull debug log failed: " + BridgeLog.Redact(ex.Message));
+            }
         }
     }
 }

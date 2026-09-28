@@ -27,9 +27,11 @@ namespace Unslop.UnityBridge.Editor.Api
     {
         public bool read;
         public bool install_report;
+        public bool diagnostics;
         public bool download;
         public bool physical_spec_write;
         public bool scale_confirm;
+        public bool publish;
     }
 
     [Serializable]
@@ -355,5 +357,68 @@ namespace Unslop.UnityBridge.Editor.Api
         public string error;
         public string message;
         public string code;
+    }
+
+    [Serializable]
+    public sealed class CreateAssetDto
+    {
+        public string display_name;
+        public string kind = "mesh";
+        public bool api_available = true;
+    }
+
+    [Serializable]
+    public sealed class UploadedFileDto
+    {
+        public string file_id;
+        public string relative_path;
+        public string role;
+        public long byte_length;
+        public string sha256;
+    }
+
+    [Serializable]
+    public sealed class SubmitVersionRequestDto
+    {
+        public object asset_json;
+        public object materials_json;
+    }
+
+    [Serializable]
+    public sealed class PublishVersionRequestDto
+    {
+        public bool recommend = true;
+    }
+
+    [Serializable]
+    public sealed class DiagnosticUploadRequestDto
+    {
+        public string session_id;
+        public string engine = "unity";
+        public string kind = "debug_session";
+        public string content;
+        public int chunk_index;
+        public bool is_final;
+        public string asset_id;
+        public ClientContextDto client = new ClientContextDto();
+        public Dictionary<string, object> summary;
+    }
+
+    [Serializable]
+    public sealed class DiagnosticUploadResultDto
+    {
+        public string diagnostic_id;
+        public string session_id;
+        public string project_id;
+        public string asset_id;
+        public string engine;
+        public string kind;
+        public long byte_length;
+        public int chunk_count;
+        public string client_version;
+        public string created_at;
+        public string last_uploaded_at;
+        public string status;
+        public string content;
     }
 }

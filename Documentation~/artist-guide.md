@@ -10,13 +10,14 @@
 | Local override materials | You | Never overwritten on update/rollback |
 | UserContent hierarchy | You | Preserved across updates when hierarchy-compatible |
 
-## Publishing expectations (server-side)
+## Publishing expectations
 
-Artists publish FBX + textures + `materials.json` + manifests through Unslop (not from this Unity package). For Unity consumers:
+Artists can publish FBX + textures + `materials.json` + manifests through Unslop (web / pipeline), **or** from Unity via **Unslop → Asset Bridge → Publish** (exports a neutral static-mesh package with `pipeline_origin: unity_prefab_export`). For Unity consumers:
 
 - Prefer metres, Y-up, bottom-centre pivot.
 - Declare hierarchy / material slot compatibility on new versions.
 - Withdrawn versions can still be rolled back project-locally; they should not be recommended.
+- Do not bake temporary `VisualCorrection` into exports — use **Set Canonical Scale** / the server-side scale-bake pipeline for that.
 
 ## Canonical scale workflow
 
@@ -47,3 +48,7 @@ Renaming **VisualCorrection** / **UserContent** / **Model** nodes breaks update 
 Version updates refresh the Visual nested content **in place**. Scene instances keep their root transform / parenting; you should not need to re-place the asset after install.
 
 When `pipeline_origin` is **`canonical_scale_bake`**, VisualCorrection is reset to `1,1,1` automatically (scale is in the mesh). Scene instances keep their floor contact point so they do not jump.
+
+## Debug logging (Meshy vs artist transforms)
+
+Enable **Debug logging** on **Unslop → Asset Bridge → Connect** (or **Project Settings → Unslop**). The bridge appends a session log at `Library/Unslop/Diagnostics/debug-session.log` covering install/update activity, with hierarchy **scale and rotation** deltas between the previously installed model (often Meshy) and the incoming version (often artist). Use **Upload Debug Log** / **Pull Latest Debug Log** against the bound project (`POST|GET /api/v1/projects/{project}/diagnostics`); installs/updates also auto-flush while debug is on.

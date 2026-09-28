@@ -12,10 +12,11 @@ Install via Unity Package Manager (disk or git URL). See the repository [README.
 
 1. Connect API key and bind project
 2. Browse and install published assets
-3. Review staged updates before accept
-4. Resolve material ownership conflicts
-5. Set canonical scale / confirm scale in Unity
-6. Rollback, pins, and drift repair
+3. Publish a local prefab as a catalog asset / new version
+4. Review staged updates before accept
+5. Resolve material ownership conflicts
+6. Set canonical scale / confirm scale in Unity
+7. Rollback, pins, and drift repair
 
 ## Supported matrix
 

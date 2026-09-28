@@ -9,6 +9,12 @@ namespace Unslop.UnityBridge.Editor.Materials
         string PipelineId { get; }
         bool IsAvailable { get; }
         string UnavailableReason { get; }
+
+        /// <summary>
+        /// Asset folder for derived maps (HDRP mask maps). Unused by adapters that assign source textures directly.
+        /// </summary>
+        string DerivedMapDirectory { get; set; }
+
         Material CreateMaterial(MaterialDefinition definition, IReadOnlyDictionary<string, Texture2D> texturesByRole);
         void ApplyTextures(Material material, MaterialDefinition definition, IReadOnlyDictionary<string, Texture2D> texturesByRole);
     }

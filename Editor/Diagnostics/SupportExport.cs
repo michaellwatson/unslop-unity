@@ -37,6 +37,14 @@ namespace Unslop.UnityBridge.Editor.Diagnostics
                     Encoding.UTF8);
             }
 
+            if (File.Exists(BridgeDebugMode.LogFilePath))
+            {
+                File.WriteAllText(
+                    Path.Combine(exportRoot, "debug-session.log"),
+                    BridgeLog.Redact(File.ReadAllText(BridgeDebugMode.LogFilePath)),
+                    Encoding.UTF8);
+            }
+
             var drift = DriftDiagnostics.Scan();
             var driftText = string.Join(
                 "\n",

@@ -9,6 +9,7 @@
 | Auth | Bridge API key `usk_…` | Stored in `Library/Unslop/Auth` only |
 | API | `https://unsloplabs.com/api/v1` | Correlation ID, Idempotency-Key, If-Match |
 | Install | Hash-verified download + staging + wrapper | GUID-stable friendly-named wrapper / visual prefabs |
+| Publish from prefab | Export FBX package + Bridge publish API | New catalog asset or new version; needs FBX Exporter when mesh is not already `.fbx` |
 | Updates | Staged + explicit accept/discard | No silent install |
 | Materials | Managed + local_override resolutions | Feature flag `unity_bridge_material_resolution_v1` |
 | Scale | Canonical write + confirmation | Feature flags for write / confirm |

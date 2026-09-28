@@ -30,5 +30,20 @@ namespace Unslop.UnityBridge.Editor.Tests
             const string msg = "Bound project Latch (c64b0622-074d-440b-96b7-fc604d2caec6).";
             Assert.That(BridgeLog.Redact(msg), Is.EqualTo(msg));
         }
+
+        [Test]
+        public void Debug_IsNoOpWhenDebugModeOff()
+        {
+            var previous = BridgeDebugMode.Enabled;
+            try
+            {
+                BridgeDebugMode.Enabled = false;
+                Assert.DoesNotThrow(() => BridgeLog.Debug("should be silent"));
+            }
+            finally
+            {
+                BridgeDebugMode.Enabled = previous;
+            }
+        }
     }
 }

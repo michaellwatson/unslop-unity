@@ -12,6 +12,7 @@
 2. Click **Test Connection** (this saves the key into `Library/Unslop/Auth` automatically, then lists projects). You can also use **Save Key** first.
 3. Select a project in the list to bind it.
 4. If a key is revoked, the UI shows a recoverable auth state — paste a new key and Test Connection again without losing installed assets.
+5. Optional: enable **Debug logging** on Connect (or Project Settings → Unslop). Logs go to `Library/Unslop/Diagnostics/debug-session.log` and can be **uploaded** / **pulled** against the bound project (`POST|GET /api/v1/projects/{project}/diagnostics`). **Pull Latest Debug Log** downloads the newest session to `Library/Unslop/Diagnostics/pulled-*.log`. Installs and staged updates auto-flush while debug is on.
 
 ## Browse and install
 
@@ -19,6 +20,15 @@
 2. Click **Install Selected Version**.
 3. The bridge downloads with hash verification, stages under `Assets/Unslop/__Staging`, generates URP materials, and builds a stable wrapper prefab under `Assets/Unslop/Installed/<DisplayName>_<shortId>/Prefabs/<DisplayName>.prefab`.
 4. Drag the **wrapper prefab** (named after the asset, not the raw FBX) into your scene. Keep the `UnslopAssetReference` component — scale/update tools look for it.
+
+## Publish a prefab as a catalog asset
+
+1. Open **Publish** (requires feature flag `unity_bridge_publish_from_prefab`, on by default).
+2. Select a Project prefab or scene instance (or click **Use Current Selection**). Unslop wrappers publish the nested **Model / Visual** mesh, not the wrapper root — VisualCorrection is not baked into the FBX.
+3. Set a **Display Name**. Choose **Create new catalog asset**, or pick an existing catalogue asset to publish a new version.
+4. Click **Publish Prefab**. The bridge exports FBX + textures + `materials.json` + preview, uploads a draft version, validates, and publishes it.
+5. The bridge then **installs the new version locally** and **updates your prefab** — wrapper prefabs and matching scene instances are reverted to the installed version, and the Publish picker moves to the refreshed asset.
+6. If the mesh is not already an `.fbx` asset on disk, install **Package Manager → FBX Exporter** (`com.unity.formats.fbx`). Skinned meshes are not supported.
 
 ## Check updates (staged acceptance)
 
@@ -62,3 +72,4 @@ EditorPrefs keys under `Unslop.Feature.*`:
 - `unity_bridge_canonical_scale_write`
 - `unity_bridge_scale_confirmation`
 - `unity_bridge_rollback`
+- `unity_bridge_publish_from_prefab`

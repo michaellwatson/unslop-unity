@@ -1,6 +1,7 @@
 using Unslop.UnityBridge.Editor.Api;
 using Unslop.UnityBridge.Editor.Authentication;
 using Unslop.UnityBridge.Editor.Bootstrap;
+using Unslop.UnityBridge.Editor.Materials;
 using Unslop.UnityBridge.Editor.Settings;
 
 namespace Unslop.UnityBridge.Editor.Services
@@ -35,7 +36,7 @@ namespace Unslop.UnityBridge.Editor.Services
                 engine = "unity",
                 unity_version = UnityEngine.Application.unityVersion,
                 bridge_version = BridgePackageInfo.Version,
-                render_pipeline = "urp",
+                render_pipeline = MaterialGenerator.DetectActivePipeline(),
                 manifest_schema_versions = new System.Collections.Generic.List<int> { 1 }
             };
         }

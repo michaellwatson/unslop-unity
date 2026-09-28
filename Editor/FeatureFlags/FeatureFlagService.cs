@@ -14,7 +14,8 @@ namespace Unslop.UnityBridge.Editor.FeatureFlags
             ["unity_bridge_material_resolution_v1"] = true,
             ["unity_bridge_canonical_scale_write"] = true,
             ["unity_bridge_scale_confirmation"] = true,
-            ["unity_bridge_rollback"] = true
+            ["unity_bridge_rollback"] = true,
+            ["unity_bridge_publish_from_prefab"] = true
         };
 
         public static void EnsureDefaults()

@@ -128,6 +128,8 @@ namespace Unslop.UnityBridge.Editor.Importing
                 $"meshLocalSize={Format(localSize)} worldAabbSize={Format(worldSize)} " +
                 $"rootLocalScale={Format(root.transform.localScale)} rootLossyScale={Format(root.transform.lossyScale)}" +
                 (string.IsNullOrEmpty(pathHint) ? string.Empty : $" path={pathHint}"));
+
+            TransformDebugLog.LogHierarchy(label + " transforms", root, pathHint);
         }
 
         static string Format(Vector3 v) => $"({v.x:F3}, {v.y:F3}, {v.z:F3})";

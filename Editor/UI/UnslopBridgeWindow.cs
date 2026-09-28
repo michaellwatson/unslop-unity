@@ -8,11 +8,14 @@ using Unslop.UnityBridge.Editor.Authentication;
 using Unslop.UnityBridge.Editor.Bootstrap;
 using Unslop.UnityBridge.Editor.Browser;
 using Unslop.UnityBridge.Editor.Diagnostics;
+using Unslop.UnityBridge.Editor.FeatureFlags;
 using Unslop.UnityBridge.Editor.Install;
 using Unslop.UnityBridge.Editor.Locking;
+using Unslop.UnityBridge.Editor.Publishing;
 using Unslop.UnityBridge.Editor.Scale;
 using Unslop.UnityBridge.Editor.Services;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -33,6 +36,11 @@ namespace Unslop.UnityBridge.Editor.UI
         ListView _versionList;
         ListView _installedList;
         Label _detailLabel;
+        ObjectField _publishPrefabField;
+        TextField _publishDisplayNameField;
+        Toggle _publishNewAssetToggle;
+        DropdownField _publishExistingAssetField;
+        Button _publishButton;
 
         ProjectDto[] _projects = Array.Empty<ProjectDto>();
         AssetSummaryDto[] _assets = Array.Empty<AssetSummaryDto>();
@@ -70,10 +78,16 @@ namespace Unslop.UnityBridge.Editor.UI
             tabs.Add(BuildConnectTab());
             tabs.Add(BuildBrowseTab());
             tabs.Add(BuildInstalledTab());
+            if (FeatureFlagService.IsEnabled("unity_bridge_publish_from_prefab"))
+            {
+                tabs.Add(BuildPublishTab());
+            }
+
             rootVisualElement.Add(tabs);
 
             RefreshStatus();
             RefreshInstalled();
+            TrySeedPublishFromSelection();
         }
 
         VisualElement BuildStatusBar()
@@ -126,6 +140,47 @@ namespace Unslop.UnityBridge.Editor.UI
             help.style.opacity = 0.75f;
             help.style.whiteSpace = WhiteSpace.Normal;
             col.Add(help);
+
+            var debugBox = new VisualElement { style = { marginTop = 12 } };
+            debugBox.Add(new Label("Diagnostics") { style = { unityFontStyleAndWeight = FontStyle.Bold } });
+            var debugToggle = new Toggle("Debug logging (project upload)")
+            {
+                value = BridgeDebugMode.Enabled,
+                tooltip = "Logs bridge activity locally and uploads to the bound project via " +
+                          "POST /projects/{id}/diagnostics (Meshy vs artist scale/rotation diffs included)."
+            };
+            debugToggle.RegisterValueChangedCallback(evt =>
+            {
+                BridgeDebugMode.Enabled = evt.newValue;
+                SetMessage(evt.newValue
+                    ? "Debug logging ON — local file + project-scoped API upload available."
+                    : "Debug logging OFF.");
+            });
+            debugBox.Add(debugToggle);
+            var debugRow = new VisualElement { style = { flexDirection = FlexDirection.Row, marginTop = 4 } };
+            debugRow.Add(new Button(BridgeDebugMode.RevealLog) { text = "Reveal Debug Log" });
+            debugRow.Add(new Button(() =>
+            {
+                BridgeDebugMode.ClearLog();
+                SetMessage("Debug log cleared (new session).");
+            }) { text = "Clear Debug Log" });
+            debugRow.Add(new Button(() => _ = UploadDebugLogAsync()) { text = "Upload Debug Log" });
+            debugRow.Add(new Button(() => _ = PullDebugLogAsync()) { text = "Pull Latest Debug Log" });
+            debugRow.Add(new Button(() =>
+            {
+                try
+                {
+                    var path = SupportExport.ExportRedactedDiagnostics("manual");
+                    SetMessage("Support export: " + path);
+                }
+                catch (Exception ex)
+                {
+                    BridgeLog.Exception(ex, "Support export");
+                    SetMessage(ex.Message);
+                }
+            }) { text = "Export Support Zip" });
+            debugBox.Add(debugRow);
+            col.Add(debugBox);
 
             col.Add(new Label("Projects (select to bind):") { style = { marginTop = 12, unityFontStyleAndWeight = FontStyle.Bold } });
             _projectList = new ListView
@@ -252,6 +307,315 @@ namespace Unslop.UnityBridge.Editor.UI
             return tab;
         }
 
+        Tab BuildPublishTab()
+        {
+            var tab = new Tab("Publish");
+            var col = new VisualElement { style = { flexDirection = FlexDirection.Column, flexGrow = 1 } };
+
+            var help = new Label(
+                "Select a Project prefab (or an Unslop wrapper). The bridge exports a neutral FBX package " +
+                "and publishes it as a catalog asset version. Install Package Manager → FBX Exporter if the " +
+                "mesh is not already an .fbx asset.");
+            help.style.whiteSpace = WhiteSpace.Normal;
+            help.style.opacity = 0.8f;
+            help.style.marginBottom = 8;
+            col.Add(help);
+
+            _publishPrefabField = new ObjectField("Prefab")
+            {
+                objectType = typeof(GameObject),
+                allowSceneObjects = true
+            };
+            _publishPrefabField.RegisterValueChangedCallback(evt =>
+            {
+                var go = evt.newValue as GameObject;
+                if (go != null && string.IsNullOrWhiteSpace(_publishDisplayNameField?.value))
+                {
+                    _publishDisplayNameField.value = go.name;
+                }
+
+                PrefillExistingAssetFromPrefab(go);
+            });
+            col.Add(_publishPrefabField);
+
+            var selectionRow = new VisualElement { style = { flexDirection = FlexDirection.Row, marginBottom = 6 } };
+            selectionRow.Add(new Button(TrySeedPublishFromSelection) { text = "Use Current Selection" });
+            col.Add(selectionRow);
+
+            _publishDisplayNameField = new TextField("Display Name");
+            col.Add(_publishDisplayNameField);
+
+            _publishNewAssetToggle = new Toggle("Create new catalog asset") { value = true };
+            _publishNewAssetToggle.RegisterValueChangedCallback(_ => UpdatePublishTargetUi());
+            col.Add(_publishNewAssetToggle);
+
+            _publishExistingAssetField = new DropdownField("Existing asset")
+            {
+                choices = new List<string> { "(refresh assets on Browse first)" }
+            };
+            col.Add(_publishExistingAssetField);
+
+            _publishButton = new Button(() => _ = PublishPrefabAsync()) { text = "Publish Prefab" };
+            _publishButton.style.marginTop = 10;
+            _publishButton.style.height = 28;
+            col.Add(_publishButton);
+
+            UpdatePublishTargetUi();
+            RefreshPublishAssetChoices();
+            tab.Add(col);
+            return tab;
+        }
+
+        void UpdatePublishTargetUi()
+        {
+            if (_publishExistingAssetField == null || _publishNewAssetToggle == null)
+            {
+                return;
+            }
+
+            _publishExistingAssetField.SetEnabled(!_publishNewAssetToggle.value);
+        }
+
+        void RefreshPublishAssetChoices()
+        {
+            if (_publishExistingAssetField == null)
+            {
+                return;
+            }
+
+            if (_assets == null || _assets.Length == 0)
+            {
+                _publishExistingAssetField.choices = new List<string> { "(no assets — Refresh Assets on Browse)" };
+                _publishExistingAssetField.index = 0;
+                return;
+            }
+
+            _publishExistingAssetField.choices = _assets
+                .Select(a => $"{a.display_name}  ({ShortId(a.asset_id)})")
+                .ToList();
+            if (_publishExistingAssetField.index < 0 || _publishExistingAssetField.index >= _assets.Length)
+            {
+                _publishExistingAssetField.index = 0;
+            }
+        }
+
+        void TrySeedPublishFromSelection()
+        {
+            if (_publishPrefabField == null)
+            {
+                return;
+            }
+
+            var selected = Selection.activeGameObject;
+            if (selected == null)
+            {
+                return;
+            }
+
+            var path = AssetDatabase.GetAssetPath(selected);
+            if (!string.IsNullOrEmpty(path) && path.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+            {
+                _publishPrefabField.value = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            }
+            else if (PrefabUtility.IsPartOfPrefabInstance(selected)
+                     || selected.GetComponentInChildren<UnslopAssetReference>(true) != null)
+            {
+                _publishPrefabField.value = selected;
+            }
+            else
+            {
+                return;
+            }
+
+            if (_publishDisplayNameField != null && string.IsNullOrWhiteSpace(_publishDisplayNameField.value))
+            {
+                _publishDisplayNameField.value = selected.name;
+            }
+
+            PrefillExistingAssetFromPrefab(_publishPrefabField.value as GameObject);
+        }
+
+        void PrefillExistingAssetFromPrefab(GameObject go)
+        {
+            if (go == null || _assets == null || _assets.Length == 0)
+            {
+                return;
+            }
+
+            PrefabPackageExporter.ResolveExportRoot(go, out var linkedAssetId);
+            if (string.IsNullOrWhiteSpace(linkedAssetId))
+            {
+                var reference = go.GetComponentInChildren<UnslopAssetReference>(true);
+                linkedAssetId = reference?.AssetId;
+            }
+
+            if (string.IsNullOrWhiteSpace(linkedAssetId))
+            {
+                return;
+            }
+
+            var idx = Array.FindIndex(_assets, a => string.Equals(a.asset_id, linkedAssetId, StringComparison.Ordinal));
+            if (idx < 0)
+            {
+                return;
+            }
+
+            if (_publishNewAssetToggle != null)
+            {
+                _publishNewAssetToggle.value = false;
+            }
+
+            RefreshPublishAssetChoices();
+            if (_publishExistingAssetField != null)
+            {
+                _publishExistingAssetField.index = idx;
+            }
+
+            UpdatePublishTargetUi();
+        }
+
+        async Task PublishPrefabAsync()
+        {
+            if (!FeatureFlagService.IsEnabled("unity_bridge_publish_from_prefab"))
+            {
+                SetMessage("Publish-from-prefab is disabled (Unslop.Feature.unity_bridge_publish_from_prefab).");
+                return;
+            }
+
+            if (!BeginBusy("Publishing…"))
+            {
+                return;
+            }
+
+            try
+            {
+                var prefab = _publishPrefabField?.value as GameObject;
+                if (prefab == null)
+                {
+                    SetMessage("Select a prefab (or scene instance) to publish.");
+                    return;
+                }
+
+                var projectId = _binding.BoundProjectId;
+                if (string.IsNullOrEmpty(projectId))
+                {
+                    SetMessage("Bind a project first (Connect tab).");
+                    return;
+                }
+
+                if (!_binding.IsAuthenticated)
+                {
+                    SetMessage("Paste a Bridge API key on Connect, then Test Connection.");
+                    return;
+                }
+
+                string existingAssetId = null;
+                if (_publishNewAssetToggle != null && !_publishNewAssetToggle.value)
+                {
+                    var idx = _publishExistingAssetField?.index ?? -1;
+                    if (idx < 0 || idx >= _assets.Length)
+                    {
+                        SetMessage("Select an existing asset, or enable Create new catalog asset.");
+                        return;
+                    }
+
+                    existingAssetId = _assets[idx].asset_id;
+                }
+
+                var displayName = string.IsNullOrWhiteSpace(_publishDisplayNameField?.value)
+                    ? prefab.name
+                    : _publishDisplayNameField.value.Trim();
+
+                if (!EditorUtility.DisplayDialog(
+                        "Unslop",
+                        string.IsNullOrEmpty(existingAssetId)
+                            ? $"Create catalog asset '{displayName}' and publish a version from this prefab?"
+                            : $"Publish a new version of '{displayName}' from this prefab?",
+                        "Publish",
+                        "Cancel"))
+                {
+                    return;
+                }
+
+                PersistApiBaseFromField();
+                RefreshApi();
+                var progress = new Progress<string>(SetMessage);
+                var result = await new PrefabPackagePublisher(_api).PublishAsync(
+                    new PrefabPublishRequest
+                    {
+                        Prefab = prefab,
+                        DisplayName = displayName,
+                        ProjectId = projectId,
+                        ExistingAssetId = existingAssetId,
+                        Recommend = true
+                    },
+                    progress).ConfigureAwait(true);
+
+                await ContinueOnMainThread(() =>
+                {
+                    SetMessage(
+                        $"Published '{result.DisplayName}' as asset {ShortId(result.AssetId)} " +
+                        $"version {ShortId(result.AssetVersionId)} (v{result.VersionNumber}).");
+                    RefreshStatus();
+                });
+
+                // Refresh catalogue without nesting BeginBusy.
+                try
+                {
+                    var page = await _api.ListProjectAssetsAsync(projectId).ConfigureAwait(true);
+                    await ContinueOnMainThread(() =>
+                    {
+                        _assets = page?.data?.ToArray() ?? Array.Empty<AssetSummaryDto>();
+                        if (_assetList != null)
+                        {
+                            _assetList.itemsSource = _assets;
+                            _assetList.RefreshItems();
+                        }
+
+                        RefreshPublishAssetChoices();
+                    });
+                }
+                catch (Exception refreshEx)
+                {
+                    BridgeLog.Warn("Post-publish asset refresh failed: " + BridgeLog.Redact(refreshEx.Message));
+                }
+
+                var installProgress = new Progress<string>(SetMessage);
+                var installResult = await new AssetInstallService(_api)
+                    .InstallAsync(result.AssetId, result.AssetVersionId, installProgress)
+                    .ConfigureAwait(true);
+
+                await ContinueOnMainThread(() =>
+                {
+                    var refreshedPrefab = PublishedPrefabRefresher.RefreshAfterInstall(prefab, installResult);
+                    if (_publishPrefabField != null && refreshedPrefab != null)
+                    {
+                        _publishPrefabField.value = refreshedPrefab;
+                    }
+
+                    if (refreshedPrefab != null)
+                    {
+                        Selection.activeObject = refreshedPrefab;
+                        EditorGUIUtility.PingObject(refreshedPrefab);
+                    }
+
+                    RefreshInstalled();
+                    SetMessage(
+                        $"Published and updated local prefab to v{result.VersionNumber} " +
+                        $"({ShortId(result.AssetVersionId)}).");
+                });
+            }
+            catch (Exception ex)
+            {
+                BridgeLog.Exception(ex, "Publish prefab");
+                await ContinueOnMainThread(() => SetMessage(BridgeLog.Redact(ex.Message)));
+            }
+            finally
+            {
+                EndBusy();
+            }
+        }
+
         void OnSaveKey()
         {
             try
@@ -297,6 +661,71 @@ namespace Unslop.UnityBridge.Editor.UI
 
             _binding.SaveApiKey(key);
             return true;
+        }
+
+        async Task UploadDebugLogAsync()
+        {
+            try
+            {
+                PersistApiBaseFromField();
+                RefreshApi();
+                var projectId = BridgeServices.Settings.BoundProjectId;
+                if (string.IsNullOrWhiteSpace(projectId))
+                {
+                    SetMessage("Bind a project before uploading the debug log.");
+                    return;
+                }
+
+                if (!BridgeDebugMode.Enabled && !System.IO.File.Exists(BridgeDebugMode.LogFilePath))
+                {
+                    SetMessage("No debug log to upload. Enable Debug logging first.");
+                    return;
+                }
+
+                SetMessage("Uploading debug log to project…");
+                var result = await BridgeDebugUploader.FlushAsync(_api, projectId, isFinal: true).ConfigureAwait(true);
+                await ContinueOnMainThread(() =>
+                {
+                    SetMessage(result == null
+                        ? "No new debug log content to upload."
+                        : $"Uploaded debug session {ShortId(result.session_id)} ({result.byte_length} bytes) to project.");
+                    RefreshStatus();
+                });
+            }
+            catch (Exception ex)
+            {
+                BridgeLog.Exception(ex, "Upload debug log");
+                await ContinueOnMainThread(() => SetMessage(BridgeLog.Redact(ex.Message)));
+            }
+        }
+
+        async Task PullDebugLogAsync()
+        {
+            try
+            {
+                PersistApiBaseFromField();
+                RefreshApi();
+                var projectId = BridgeServices.Settings.BoundProjectId;
+                if (string.IsNullOrWhiteSpace(projectId))
+                {
+                    SetMessage("Bind a project before pulling debug logs.");
+                    return;
+                }
+
+                SetMessage("Pulling latest project debug log…");
+                var path = await BridgeDebugUploader.PullLatestAsync(_api, projectId).ConfigureAwait(true);
+                await ContinueOnMainThread(() =>
+                {
+                    SetMessage("Pulled debug log: " + path);
+                    EditorUtility.RevealInFinder(path);
+                    RefreshStatus();
+                });
+            }
+            catch (Exception ex)
+            {
+                BridgeLog.Exception(ex, "Pull debug log");
+                await ContinueOnMainThread(() => SetMessage(BridgeLog.Redact(ex.Message)));
+            }
         }
 
         async Task TestConnectionAsync()
@@ -513,6 +942,7 @@ namespace Unslop.UnityBridge.Editor.UI
                     _versionList.RefreshItems();
                     SetMessage($"Loaded {_assets.Length} asset(s).");
                     RefreshStatus();
+                    RefreshPublishAssetChoices();
                 });
             }
             catch (UnslopApiException ex) when (ex.IsUnauthorized)

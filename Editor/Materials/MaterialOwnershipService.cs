@@ -325,6 +325,12 @@ namespace Unslop.UnityBridge.Editor.Materials
                 return;
             }
 
+            var materialDir = Path.GetDirectoryName(conflict.MaterialPath)?.Replace('\\', '/');
+            if (!string.IsNullOrEmpty(materialDir))
+            {
+                adapter.DerivedMapDirectory = materialDir;
+            }
+
             var textures = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
             if (!propertiesOnly && definition.textures != null)
             {

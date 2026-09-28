@@ -114,7 +114,8 @@ namespace Unslop.UnityBridge.Editor.Install
             var materials = generator.Generate(download.Materials, installedRoot, materialsDir);
             if (materials.ManagedCount == 0)
             {
-                BridgeLog.Warn("No managed materials generated — check URP Lit shader and materials.json.");
+                BridgeLog.Warn(
+                    $"No managed materials generated — check the {materials.AdapterPipeline} Lit shader and materials.json.");
             }
 
             // Promote model into Installed before wrapper build so source GUID is under Installed when possible.
@@ -133,11 +134,32 @@ namespace Unslop.UnityBridge.Editor.Install
                 Path.Combine(download.DownloadRoot, (download.Manifest?.model?.relative_path ?? "model.fbx").Replace('/', Path.DirectorySeparatorChar)),
                 expectedModelSha);
             MeshImportDiagnostics.LogFile("Model staging", ToFull(staging.ModelAssetPath), expectedModelSha);
+            TransformDebugLog.LogAssetHierarchy("Model staging hierarchy", staging.ModelAssetPath);
+
+            // Compare before overwrite so Meshy/previous vs incoming artist transforms are meaningful.
+            if (BridgeDebugMode.Enabled
+                && previousEntry != null
+                && !string.IsNullOrEmpty(previousEntry.source_fbx_guid))
+            {
+                var previousModelPath = AssetDatabase.GUIDToAssetPath(previousEntry.source_fbx_guid);
+                if (!string.IsNullOrEmpty(previousModelPath) && File.Exists(ToFull(previousModelPath)))
+                {
+                    BridgeLog.Debug(
+                        $"Install transform compare previous={previousModelPath} → staging={staging.ModelAssetPath} " +
+                        $"(pipeline={detail.pipeline_origin ?? detail.compatibility?.pipeline_origin ?? "unknown"})");
+                    TransformDebugLog.CompareAssetHierarchies(
+                        "previous(Meshy/installed)",
+                        previousModelPath,
+                        "incoming(artist/candidate)",
+                        staging.ModelAssetPath);
+                }
+            }
 
             CopyAssetPreservingMeta(staging.ModelAssetPath, installedModelPath);
             ForceReimportModel(installedModelPath);
             MeshImportDiagnostics.LogFile("Model installed", ToFull(installedModelPath), expectedModelSha);
             MeshImportDiagnostics.LogAssetMeshBounds("Model installed (Unity import)", installedModelPath);
+            TransformDebugLog.LogAssetHierarchy("Model installed hierarchy", installedModelPath);
 
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
@@ -155,6 +177,8 @@ namespace Unslop.UnityBridge.Editor.Install
                 displayName);
             MeshImportDiagnostics.LogAssetMeshBounds("Visual prefab after build", wrapper.VisualPrefabPath);
             MeshImportDiagnostics.LogAssetMeshBounds("Asset prefab after build", wrapper.AssetPrefabPath);
+            TransformDebugLog.LogAssetHierarchy("Wrapper Visual after build", wrapper.VisualPrefabPath);
+            TransformDebugLog.LogAssetHierarchy("Wrapper Asset after build", wrapper.AssetPrefabPath);
 
             status?.Report("Assigning materials to Visual…");
             var assigned = MaterialSlotApplicator.ApplyToPrefab(
@@ -242,6 +266,7 @@ namespace Unslop.UnityBridge.Editor.Install
             }
 
             BridgeLog.Info($"Installed asset {assetId} version {versionId} (tx={transactionId}).");
+            BridgeDebugUploader.TryFlushFireAndForget(assetId, isFinal: true);
             return new AssetInstallResult
             {
                 AssetId = assetId,

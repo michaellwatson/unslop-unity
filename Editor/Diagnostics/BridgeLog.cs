@@ -1,6 +1,6 @@
 using System;
 using System.Text.RegularExpressions;
-using UnityEngine;
+using UDebug = UnityEngine.Debug;
 
 namespace Unslop.UnityBridge.Editor.Diagnostics
 {
@@ -20,13 +20,48 @@ namespace Unslop.UnityBridge.Editor.Diagnostics
             return SecretPattern.Replace(message, "[REDACTED]");
         }
 
-        public static void Info(string message) => Debug.Log($"[Unslop] {Redact(message)}");
-        public static void Warn(string message) => Debug.LogWarning($"[Unslop] {Redact(message)}");
-        public static void Error(string message) => Debug.LogError($"[Unslop] {Redact(message)}");
+        public static void Info(string message)
+        {
+            var redacted = Redact(message);
+            UDebug.Log($"[Unslop] {redacted}");
+            BridgeDebugMode.Append("INFO", redacted);
+        }
+
+        public static void Warn(string message)
+        {
+            var redacted = Redact(message);
+            UDebug.LogWarning($"[Unslop] {redacted}");
+            BridgeDebugMode.Append("WARN", redacted);
+        }
+
+        public static void Error(string message)
+        {
+            var redacted = Redact(message);
+            UDebug.LogError($"[Unslop] {redacted}");
+            BridgeDebugMode.Append("ERROR", redacted);
+        }
+
+        /// <summary>
+        /// Verbose diagnostics — Console + session file only when <see cref="BridgeDebugMode"/> is on.
+        /// </summary>
+        public static void Debug(string message)
+        {
+            if (!BridgeDebugMode.Enabled)
+            {
+                return;
+            }
+
+            var redacted = Redact(message);
+            UDebug.Log($"[Unslop:debug] {redacted}");
+            BridgeDebugMode.Append("DEBUG", redacted);
+        }
+
         public static void Exception(Exception ex, string context = null)
         {
             var prefix = string.IsNullOrEmpty(context) ? string.Empty : context + ": ";
-            Debug.LogError($"[Unslop] {prefix}{Redact(ex?.Message)}\n{Redact(ex?.ToString())}");
+            var text = $"{prefix}{Redact(ex?.Message)}\n{Redact(ex?.ToString())}";
+            UDebug.LogError($"[Unslop] {text}");
+            BridgeDebugMode.Append("EXCEPTION", text);
         }
     }
 }

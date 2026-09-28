@@ -9,6 +9,7 @@ using Unslop.UnityBridge.Editor.Manifests;
 using Unslop.UnityBridge.Editor.Security;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Unslop.UnityBridge.Editor.Materials
 {
@@ -27,14 +28,46 @@ namespace Unslop.UnityBridge.Editor.Materials
 
         public MaterialGenerator(IRenderPipelineMaterialAdapter adapter = null)
         {
-            _adapter = adapter ?? new UrpMaterialAdapter();
+            _adapter = adapter ?? ResolveAdapter();
         }
 
-        public static IRenderPipelineMaterialAdapter ResolveAdapter(string pipeline = "urp")
+        /// <summary>
+        /// Active project pipeline. HDRP when the current render pipeline asset is HDRP, otherwise URP.
+        /// </summary>
+        public static string DetectActivePipeline()
         {
+            var pipeline = GraphicsSettings.currentRenderPipeline
+                ?? QualitySettings.renderPipeline;
+            var typeName = pipeline != null ? pipeline.GetType().Name : string.Empty;
+            if (typeName.IndexOf("HDRenderPipeline", StringComparison.OrdinalIgnoreCase) >= 0
+                || typeName.IndexOf("HighDefinition", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "hdrp";
+            }
+
+            if (typeName.IndexOf("Universal", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "urp";
+            }
+
+            if (Shader.Find("HDRP/Lit") != null && Shader.Find("Universal Render Pipeline/Lit") == null)
+            {
+                return "hdrp";
+            }
+
+            return "urp";
+        }
+
+        public static IRenderPipelineMaterialAdapter ResolveAdapter(string pipeline = null)
+        {
+            if (string.IsNullOrWhiteSpace(pipeline))
+            {
+                pipeline = DetectActivePipeline();
+            }
+
             if (string.Equals(pipeline, "hdrp", StringComparison.OrdinalIgnoreCase))
             {
-                return new HdrpMaterialAdapterPlaceholder();
+                return new HdrpMaterialAdapter();
             }
 
             return new UrpMaterialAdapter();
@@ -59,6 +92,7 @@ namespace Unslop.UnityBridge.Editor.Materials
             }
 
             ManagedPaths.EnsureDirectory(installedMaterialsDir);
+            _adapter.DerivedMapDirectory = installedMaterialsDir;
             AssetDatabase.Refresh();
 
             foreach (var definition in materials.materials ?? Enumerable.Empty<MaterialDefinition>())

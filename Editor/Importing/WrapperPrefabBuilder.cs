@@ -362,6 +362,16 @@ namespace Unslop.UnityBridge.Editor.Importing
             BridgeLog.Info(
                 $"Nested '{instanceName}' under '{parent.name}' preserving localScale={nativeScale} " +
                 $"(lossy={nested.transform.lossyScale})");
+            BridgeLog.Debug(
+                $"Nested transform detail '{instanceName}': " +
+                $"sourceLocalEuler={sourcePrefab.transform.localEulerAngles} " +
+                $"sourceLocalScale={sourcePrefab.transform.localScale} " +
+                $"sourceLossy={sourcePrefab.transform.lossyScale} " +
+                $"placedLocalEuler={nested.transform.localEulerAngles} " +
+                $"placedLocalScale={nested.transform.localScale} " +
+                $"placedLossy={nested.transform.lossyScale} " +
+                $"parentLossy={parent.lossyScale}");
+            TransformDebugLog.LogHierarchy($"Nested {instanceName}", nested);
         }
 
         static Transform FindDirectChild(Transform parent, string childName)

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Unslop.UnityBridge.Editor.Diagnostics;
+using UnityEngine;
 using UnityEngine.Networking;
 
 namespace Unslop.UnityBridge.Editor.Api
@@ -69,6 +70,46 @@ namespace Unslop.UnityBridge.Editor.Api
         public Task RecordCandidateDecisionAsync(string projectId, string assetId, CandidateDecisionDto decision, string idempotencyKey = null, CancellationToken cancellationToken = default)
             => SendAsync<object>("POST", $"/projects/{Esc(projectId)}/asset-installations/{Esc(assetId)}/candidate-decisions", decision ?? throw new ArgumentNullException(nameof(decision)), idempotencyKey, null, cancellationToken);
 
+        public Task<DiagnosticUploadResultDto> UploadProjectDiagnosticsAsync(string projectId, DiagnosticUploadRequestDto request, string idempotencyKey = null, CancellationToken cancellationToken = default)
+            => SendAsync<DiagnosticUploadResultDto>("POST", $"/projects/{Esc(projectId)}/diagnostics", request ?? throw new ArgumentNullException(nameof(request)), idempotencyKey, null, cancellationToken);
+
+        public Task<CursorPage<DiagnosticUploadResultDto>> ListProjectDiagnosticsAsync(
+            string projectId,
+            string engine = null,
+            string kind = null,
+            string cursor = null,
+            int? limit = null,
+            CancellationToken cancellationToken = default)
+        {
+            var path = BuildPath($"/projects/{Esc(projectId)}/diagnostics", cursor, limit);
+            if (!string.IsNullOrWhiteSpace(engine))
+            {
+                path += (path.Contains("?") ? "&" : "?") + "engine=" + Esc(engine);
+            }
+
+            if (!string.IsNullOrWhiteSpace(kind))
+            {
+                path += (path.Contains("?") ? "&" : "?") + "kind=" + Esc(kind);
+            }
+
+            return GetAsync<CursorPage<DiagnosticUploadResultDto>>(path, cancellationToken);
+        }
+
+        public Task<DiagnosticUploadResultDto> GetProjectDiagnosticAsync(
+            string projectId,
+            string sessionId,
+            bool includeContent = true,
+            CancellationToken cancellationToken = default)
+        {
+            var path = $"/projects/{Esc(projectId)}/diagnostics/{Esc(sessionId)}";
+            if (!includeContent)
+            {
+                path += "?include_content=false";
+            }
+
+            return GetAsync<DiagnosticUploadResultDto>(path, cancellationToken);
+        }
+
         public Task<CursorPage<PhysicalSpecRevisionDto>> ListPhysicalSpecRevisionsAsync(string assetId, string cursor = null, CancellationToken cancellationToken = default)
             => GetAsync<CursorPage<PhysicalSpecRevisionDto>>(BuildPath($"/assets/{Esc(assetId)}/physical-spec-revisions", cursor, null), cancellationToken);
 
@@ -98,8 +139,125 @@ namespace Unslop.UnityBridge.Editor.Api
         public Task<ScaleConfirmationDto> SubmitScaleConfirmationAsync(string assetId, ScaleConfirmationCreateDto request, string idempotencyKey = null, CancellationToken cancellationToken = default)
             => SendAsync<ScaleConfirmationDto>("POST", $"/assets/{Esc(assetId)}/scale-confirmations", request ?? throw new ArgumentNullException(nameof(request)), idempotencyKey, null, cancellationToken);
 
+        public Task<AssetSummaryDto> CreateProjectAssetAsync(string projectId, CreateAssetDto request, string idempotencyKey = null, CancellationToken cancellationToken = default)
+            => SendAsync<AssetSummaryDto>("POST", $"/projects/{Esc(projectId)}/assets", request ?? throw new ArgumentNullException(nameof(request)), idempotencyKey, null, cancellationToken);
+
+        public Task<AssetVersionSummaryDto> CreateDraftVersionAsync(string assetId, string idempotencyKey = null, CancellationToken cancellationToken = default)
+            => SendAsync<AssetVersionSummaryDto>("POST", $"/assets/{Esc(assetId)}/versions", new { }, idempotencyKey, null, cancellationToken);
+
+        public Task<UploadedFileDto> UploadVersionFileAsync(
+            string assetId,
+            string versionId,
+            string relativePath,
+            string role,
+            string mediaType,
+            byte[] contents,
+            string idempotencyKey = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (contents == null || contents.Length == 0)
+            {
+                throw new ArgumentException("File contents are required.", nameof(contents));
+            }
+
+            return SendMultipartAsync<UploadedFileDto>(
+                $"/assets/{Esc(assetId)}/versions/{Esc(versionId)}/files",
+                relativePath,
+                role,
+                mediaType,
+                contents,
+                idempotencyKey,
+                cancellationToken);
+        }
+
+        public Task<AssetVersionSummaryDto> SubmitVersionAsync(
+            string assetId,
+            string versionId,
+            object assetJson,
+            object materialsJson,
+            string idempotencyKey = null,
+            CancellationToken cancellationToken = default)
+            => SendAsync<AssetVersionSummaryDto>(
+                "POST",
+                $"/assets/{Esc(assetId)}/versions/{Esc(versionId)}/submit",
+                new SubmitVersionRequestDto
+                {
+                    asset_json = assetJson ?? throw new ArgumentNullException(nameof(assetJson)),
+                    materials_json = materialsJson ?? throw new ArgumentNullException(nameof(materialsJson))
+                },
+                idempotencyKey,
+                null,
+                cancellationToken);
+
+        public Task<AssetVersionSummaryDto> PublishVersionAsync(
+            string assetId,
+            string versionId,
+            bool recommend = true,
+            string idempotencyKey = null,
+            CancellationToken cancellationToken = default)
+            => SendAsync<AssetVersionSummaryDto>(
+                "POST",
+                $"/assets/{Esc(assetId)}/versions/{Esc(versionId)}/publish",
+                new PublishVersionRequestDto { recommend = recommend },
+                idempotencyKey,
+                null,
+                cancellationToken);
+
         Task<T> GetAsync<T>(string path, CancellationToken cancellationToken)
             => SendAsync<T>("GET", path, null, null, null, cancellationToken);
+
+        async Task<T> SendMultipartAsync<T>(
+            string path,
+            string relativePath,
+            string role,
+            string mediaType,
+            byte[] contents,
+            string idempotencyKey,
+            CancellationToken cancellationToken)
+        {
+            var correlationId = Guid.NewGuid().ToString("N");
+            LastCorrelationId = correlationId;
+
+            var apiKey = _apiKeyProvider();
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                throw new UnslopApiException(401, "Bridge API key is not configured.", correlationId, null);
+            }
+
+            var form = new WWWForm();
+            form.AddField("relative_path", relativePath ?? string.Empty);
+            form.AddField("role", role ?? string.Empty);
+            if (!string.IsNullOrWhiteSpace(mediaType))
+            {
+                form.AddField("media_type", mediaType);
+            }
+
+            var fileName = System.IO.Path.GetFileName(relativePath?.Replace('\\', '/') ?? "upload.bin");
+            form.AddBinaryData("file", contents, fileName, string.IsNullOrWhiteSpace(mediaType) ? "application/octet-stream" : mediaType);
+
+            using var request = UnityWebRequest.Post(_baseUrl + path, form);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Accept", "application/json");
+            request.SetRequestHeader("Authorization", "Bearer " + apiKey.Trim());
+            request.SetRequestHeader("X-Correlation-ID", correlationId);
+            request.SetRequestHeader(
+                "Idempotency-Key",
+                string.IsNullOrWhiteSpace(idempotencyKey) ? Guid.NewGuid().ToString("N") : idempotencyKey);
+
+            var operation = request.SendWebRequest();
+            while (!operation.isDone)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    request.Abort();
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                await Task.Yield();
+            }
+
+            return ParseResponse<T>(request, "POST", path, correlationId);
+        }
 
         async Task<T> SendAsync<T>(string method, string path, object body, string idempotencyKey, string ifMatch, CancellationToken cancellationToken)
         {
@@ -151,6 +309,11 @@ namespace Unslop.UnityBridge.Editor.Api
                 await Task.Yield();
             }
 
+            return ParseResponse<T>(request, method, path, correlationId);
+        }
+
+        T ParseResponse<T>(UnityWebRequest request, string method, string path, string correlationId)
+        {
             var responseCorrelation = request.GetResponseHeader("X-Correlation-ID") ?? correlationId;
             LastCorrelationId = responseCorrelation;
             var status = (int)request.responseCode;
@@ -194,6 +357,19 @@ namespace Unslop.UnityBridge.Editor.Api
                     if (!string.IsNullOrWhiteSpace(err?.error))
                     {
                         return err.error;
+                    }
+
+                    // Nested Bridge error envelope: { "error": { "message": "..." } }
+                    var nested = JsonConvert.DeserializeObject<Dictionary<string, object>>(responseBody, JsonSettings);
+                    if (nested != null && nested.TryGetValue("error", out var errorObj) && errorObj != null)
+                    {
+                        var nestedDto = JsonConvert.DeserializeObject<ApiErrorDto>(
+                            errorObj.ToString() ?? string.Empty,
+                            JsonSettings);
+                        if (!string.IsNullOrWhiteSpace(nestedDto?.message))
+                        {
+                            return nestedDto.message;
+                        }
                     }
                 }
                 catch

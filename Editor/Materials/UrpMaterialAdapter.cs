@@ -9,6 +9,7 @@ namespace Unslop.UnityBridge.Editor.Materials
     public sealed class UrpMaterialAdapter : IRenderPipelineMaterialAdapter
     {
         public string PipelineId => "urp";
+        public string DerivedMapDirectory { get; set; }
 
         public bool IsAvailable
         {

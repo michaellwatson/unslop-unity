@@ -196,9 +196,24 @@ namespace Unslop.UnityBridge.Editor.Transactions
                     installedModel,
                     staging.ModelAssetPath);
 
+                if (BridgeDebugMode.Enabled && session.Diff != null)
+                {
+                    BridgeLog.Debug(
+                        $"Update diff summary asset={journal.asset_id} " +
+                        $"from={journal.from_version_id} to={journal.to_version_id} " +
+                        $"pipeline={session.PipelineOrigin ?? "(none)"} " +
+                        $"changed={session.Diff.ChangedCount} " +
+                        $"bounds {session.Diff.InstalledBoundsSize} → {session.Diff.CandidateBoundsSize}");
+                    foreach (var entry in session.Diff.Entries.Where(e => e.Kind != DiffKind.Unchanged))
+                    {
+                        BridgeLog.Debug($"  diff [{entry.Category}] {entry.Kind} {entry.Path}: {entry.Detail}");
+                    }
+                }
+
                 TransactionJournal.Advance(journal, TransactionPhases.Verified, "awaiting_acceptance");
                 BridgeLog.Info(
                     $"Staged update {journal.asset_id}: {journal.from_version_id} → {journal.to_version_id} (tx={journal.transaction_id}). Awaiting explicit accept.");
+                BridgeDebugUploader.TryFlushFireAndForget(journal.asset_id, isFinal: false);
                 return session.Diff;
             }
             catch (Exception ex)
